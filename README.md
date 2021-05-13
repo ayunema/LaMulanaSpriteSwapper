@@ -41,3 +41,13 @@ The code is ugly, and will be for a while.
  **Okay but why didn't you start with that instead of the more-complicated Moogle example?**
  
  I am not good at this.
+
+
+
+## Known Issues
+AKA a lazy TODO list/issue tracker
+
+* `Refresh sprite files` button doesn't work following the JFX->Spring migration
+* App looks like garbage
+* Code looks like garbage
+* Needs more sprites/variants
