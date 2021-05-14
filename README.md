@@ -47,7 +47,7 @@ The code is ugly, and will be for a while.
 ## Known Issues
 AKA a lazy TODO list/issue tracker
 
-* `Refresh sprite files` button doesn't work following the JFX->Spring migration
-* App looks like garbage
-* Code looks like garbage
+* App still kinda looks like garbage
+* Code COULD be less garbagey
 * Needs more sprites/variants
+* Not sure how stuff looks on other Operating Systems, but it's probably all out of whack. (Might have to fall back on the ugly default Look & Feel)
