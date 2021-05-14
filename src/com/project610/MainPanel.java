@@ -1,311 +1,322 @@
 package com.project610;
 
 import com.project610.utils.JList2;
-import javafx.embed.swing.SwingFXUtils;
+import com.sun.istack.internal.Nullable;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
-public class MainPanel extends JPanel {
+class MainPanel extends JPanel {
 
-    JTextField installDirBox;
-    JList2<String> spriteList;
-    JList2<String> variantList;
-    JCheckBox freshStart;
-    JLabel imageView;
+    private JTextField installDirBox;
+    private JList2<String> spriteList;
+    private JList2<String> variantList;
+    private JCheckBox freshStart;
+    private JLabel imageView;
+    private JTextArea console;
+    private JScrollPane consoleScroll;
 
-    String graphicsPath = "data\\graphics\\00";
-    String cwd = "sprites";
-    String extension = ".png";
+    private String graphicsPath = "data" + File.separator + "graphics" + File.separator + "00";
+    private String spritesPath = "sprites";
+    private String extension = ".png";
 
-    HashMap<String,Sprite> sprites = new HashMap<>();
+    private boolean debug = false;
 
-    public MainPanel(String[] args) {
+    private int LOG_LEVEL = 6; // 3 err, 4 warn, 6 info, 7 debug
+
+    private HashMap<String,Sprite> sprites = new HashMap<>();
+
+    MainPanel(String[] args) {
         init();
 
         if (installDirBox.getText().trim().isEmpty()) {
             guessInstallLocation();
         }
 
-        reload();
+        loadSprites();
     }
 
-    public void init() {
+    private void init() {
         removeAll();
 
-        // basically a vbox
-        //setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setLayout(null);
+        setLayout(new BorderLayout(0, 0));
 
+        if (debug) setBackground(new Color (0.3f, 0.3f, 0.3f));
 
         JPanel topPane = new JPanel();
-        //topPane.setLayout(new BoxLayout(topPane, BoxLayout.X_AXIS));
-        topPane.setLayout(null);
+        if (debug) topPane.setBackground(new Color(1f, 0f, 0f));
+        topPane.setLayout(new FlowLayout(FlowLayout.LEFT));
+        add(prefSize(topPane, 700, 30), BorderLayout.PAGE_START);
 
-        //topPane.setBorder(BorderFactory.createBevelBorder(BevelBorder.LOWERED));
-        //topPane.setBackground(new Color(1f, 0f, 0f));
-        topPane.setSize(700, 30);
-        add(topPane);
+        topPane.add(prefSize(new JLabel("La-Mulana install directory"), 135, 20));
 
-        topPane.add(place(new JLabel("La-Mulana install directory"), 5, 5, 135, 20));
-
-        installDirBox = new JTextField(15);
-        topPane.add(place(installDirBox, 145, 5, 400, 20));
+        installDirBox = new JTextField(40);
+        topPane.add(prefSize(installDirBox, 400, 20));
 
 
 
 
-        JPanel midPane = new JPanel(null);
+        JPanel midPane = new JPanel(new BorderLayout(0, 0));
+        if (debug) midPane.setBackground(new Color(1f, 1f, 0f));
         midPane.setBorder(BorderFactory.createLineBorder(Color.lightGray));
 
-        //midPane.setLayout(new BoxLayout(midPane, BoxLayout.X_AXIS));
-        //midPane.setBackground(new Color(0f, 1f, 0f));
-        add(place(midPane, 0, 30, 700, 300));
+        midPane.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        add(prefSize(midPane, 700, 300), BorderLayout.CENTER);
 
-        JPanel spriteListPane = new JPanel(null);
-        spriteListPane.setBorder(BorderFactory.createLineBorder(Color.lightGray));
-        //firstListPane.setSize(50,300);
-        //firstListPane.setBackground(new Color(0.5f, 0.5f, 0.5f));
-        midPane.add(place(spriteListPane, 0, 0, 170, 290));
+        JPanel spriteListPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        if (debug) spriteListPane.setBackground(new Color(0.3f, 0.3f, 0.6f));
+        spriteListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
+        //midPane.add(prefSize(spriteListPane, 170, 300));
+        //midPane.add(spriteListPane, BorderLayout.LINE_START);
+        midPane.add(prefSize(spriteListPane, 170, 300), BorderLayout.LINE_START);
 
-        spriteListPane.add(place(new JLabel("Sprite"), 10, 2, 150, 20));
+        spriteListPane.add(prefSize(new JLabel("   Sprite"), 170, 20));
         spriteList = new JList2<>();
         spriteList.setBorder(BorderFactory.createLineBorder(Color.lightGray));
         spriteList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        spriteListPane.add(place(spriteList, 4, 25, 160, 260));
+        spriteList.setVisibleRowCount(12);
+        spriteList.setPrototypeCellValue("Lick my balls");
+        spriteListPane.add(prefSize(spriteList, 159, 266));
         
-        spriteList.addListSelectionListener(new ListSelectionListener() {
-            @Override
-            public void valueChanged(ListSelectionEvent e) {
-                System.out.println("spriteList Click on " + spriteList.getSelectedValue() + ": " + e.getFirstIndex() + "/" + e.getLastIndex());
-                variantList.clear();
-                variantList.addAll(sprites.get(spriteList.getSelectedValue()).variants.keySet());
-            }
+        spriteList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) return;
+
+            variantList.clear();
+            variantList.addAll(sprites.get(spriteList.getSelectedValue()).variants.keySet());
         });
 
+        JPanel variantListPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        if (debug) variantListPane.setBackground(new Color(0.4f, 0.4f, 0.8f));
+        variantListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
+        //midPane.add(prefSize(variantListPane, 170, 300));
+        //midPane.add(variantListPane, BorderLayout.CENTER);
+        midPane.add(prefSize(variantListPane, 170, 300), BorderLayout.CENTER);
 
-        JPanel variantListPane = new JPanel(null);
-        variantListPane.setBorder(BorderFactory.createLineBorder(Color.lightGray));
-        //secondListPane.setBackground(new Color(0.25f, 0.25f, 0.25f));
-        midPane.add(place(variantListPane, 175, 0, 170, 290));
-
-        variantListPane.add(place(new JLabel("Variant"), 10, 2, 150, 20));
+        variantListPane.add(prefSize(new JLabel("   Variant"), 170, 20));
         variantList = new JList2<>();
         variantList.setBorder(BorderFactory.createLineBorder(Color.lightGray));
         variantList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        variantListPane.add(place(variantList, 4, 25, 160, 260));
+        variantListPane.add(prefSize(variantList, 159, 266));
 
-        variantList.addListSelectionListener(new ListSelectionListener() {
-            @Override
-            public void valueChanged(ListSelectionEvent e) {
-                if (!e.getValueIsAdjusting()) return;
+        variantList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) return;
 
-                Sprite currentSprite = sprites.get(spriteList.getSelectedValue());
-                //Variant currentVariant = currentSprite.variants.get(secondList.getSelectionModel().getSelectedItem());
-                Variant currentVariant = currentSprite.variants.get(variantList.getSelectedValue());
+            Sprite currentSprite = sprites.get(spriteList.getSelectedValue());
+            Variant currentVariant = currentSprite.variants.get(variantList.getSelectedValue());
 
-                //Image image = new Image(cwd + File.separator + firstList.getSelectionModel().getSelectedItem());
+            try {
+                // Ideally, a thumbnail will be provided to give an idea of what's being set
+                String spritesheetName = "thumbnail";
+                BufferedImage thumbnail;
                 try {
-                    // Grab name of first spritesheet (for now)
-                    String spritesheetName = "thumbnail";
-                    BufferedImage thumbnail;
-                    try {
-                        thumbnail = currentVariant.spritesheetImages.get("thumbnail");
-                        thumbnail.getRGB(0,0);
-                    } catch (Exception ex) {
-                        for (String key : currentVariant.spritesheetImages.keySet()) {
-                            spritesheetName = key;
-                            break;
-                        }
+                    thumbnail = currentVariant.spritesheetImages.get("thumbnail");
+                    thumbnail.getRGB(0,0);
+                }
+                // If there's no thumbnail, fall back on whatever first spritesheet we can find
+                catch (Exception ex) {
+                    for (String key : currentVariant.spritesheetImages.keySet()) {
+                        spritesheetName = key;
+                        break;
                     }
+                }
 
-                    BufferedImage newImage = null;
-                    if (freshStart.isSelected()) {
-                        newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(spritesheetName));
-                    } else {
-                        newImage = ImageIO.read(new File(path() + File.separator + spritesheetName + ".png"));
-                    }
-                    BufferedImage replacement = currentVariant.spritesheetImages.get(spritesheetName);
-                    BufferedImage mask = currentVariant.spritesheetMasks.get(spritesheetName);
+                // TODO: Cool duplicated code, bro
+                BufferedImage newImage;
+                if (freshStart.isSelected()) {
+                    newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(spritesheetName));
+                } else {
+                    newImage = ImageIO.read(new File(path() + File.separator + spritesheetName + ".png"));
+                }
+                BufferedImage replacement = currentVariant.spritesheetImages.get(spritesheetName);
+                BufferedImage mask = currentVariant.spritesheetMasks.get(spritesheetName);
 
-                    Color transparent = new Color(0,0,0,0);
+                Color transparent = new Color(0,0,0,0);
 
-                    // If there's no mask, delete everything
-                    if (null == mask) {
-                        newImage = replacement;
-                    }
-                    else {
-                        for (int y = 0; y < replacement.getHeight(); y++) {
-                            for (int x = 0; x < replacement.getWidth(); x++) {
-                                Color replacementColor = new Color(replacement.getRGB(x, y), true);
-                                int replacementAlpha = replacementColor.getAlpha();
-                                // Replace the pixel if it's not totally transparent
-                                if (replacementAlpha != 0) {
-                                    newImage.setRGB(x, y, replacement.getRGB(x, y));
-                                }
-                                // If it was totally transparent, check if this is something that should be left alone
-                                // Delete areas where the mask colour is non-black
-                                else if (new Color(mask.getRGB(x, y)).getBlue() != 0) {
-                                    newImage.setRGB(x, y, transparent.getRGB());
-                                }
-                                // Leave this pixel alone
-                                else {
-                                }
+                // If there's no mask, delete everything
+                if (null == mask) {
+                    newImage = replacement;
+                }
+                else {
+                    for (int y = 0; y < replacement.getHeight(); y++) {
+                        for (int x = 0; x < replacement.getWidth(); x++) {
+                            Color replacementColor = new Color(replacement.getRGB(x, y), true);
+                            int replacementAlpha = replacementColor.getAlpha();
+                            // Replace the pixel if it's not totally transparent
+                            if (replacementAlpha != 0) {
+                                newImage.setRGB(x, y, replacement.getRGB(x, y));
+                            }
+                            // If it was totally transparent, check if this is something that should be left alone
+                            // Delete areas where the mask colour is non-black
+                            else if (new Color(mask.getRGB(x, y)).getBlue() != 0) {
+                                newImage.setRGB(x, y, transparent.getRGB());
                             }
                         }
                     }
-
-                    AffineTransform transform = new AffineTransform();
-                    double scale = 1;
-                    scale = Math.min(scale, (double)imageView.getWidth()/newImage.getWidth());
-                    scale = Math.min(scale, (double)imageView.getHeight()/newImage.getHeight());
-                    transform.scale(scale, scale);
-                    AffineTransformOp transformOp = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
-                    BufferedImage scaledImage = new BufferedImage((int)(newImage.getWidth()*scale),(int)(newImage.getHeight()*scale), BufferedImage.TYPE_INT_ARGB);
-                    scaledImage = transformOp.filter(newImage, scaledImage);
-                    imageView.setIcon(new ImageIcon(scaledImage));
-
-                } catch (Exception ex) {
-                    System.err.println("Failed to display image");
-                    ex.printStackTrace();
                 }
+
+                AffineTransform transform = new AffineTransform();
+                double scale = 1;
+                scale = Math.min(scale, (double)imageView.getWidth()/newImage.getWidth());
+                scale = Math.min(scale, (double)imageView.getHeight()/newImage.getHeight());
+                transform.scale(scale, scale);
+                AffineTransformOp transformOp = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
+                BufferedImage scaledImage = new BufferedImage((int)(newImage.getWidth()*scale),(int)(newImage.getHeight()*scale), BufferedImage.TYPE_INT_ARGB);
+                scaledImage = transformOp.filter(newImage, scaledImage);
+                imageView.setIcon(new ImageIcon(scaledImage));
+
+            } catch (Exception ex) {
+                System.err.println("Failed to display image");
+                ex.printStackTrace();
             }
         });
 
         JPanel previewPane = new JPanel();
-        previewPane.setLayout(null);
-        midPane.add(place(previewPane, 350, 0, 350, 300));
+        if (debug) previewPane.setBackground(new Color(0.6f, 0.6f, 1.0f));
+        previewPane.setLayout(new FlowLayout(FlowLayout.LEFT));
+        //midPane.add(prefSize(previewPane, 340, 300));
+        midPane.add(previewPane, BorderLayout.LINE_END);
+        midPane.add(prefSize(previewPane, 350, 300), BorderLayout.LINE_END);
 
         freshStart = new JCheckBox("Fresh start", true);
-        previewPane.setBorder(BorderFactory.createLineBorder(Color.lightGray));
-        previewPane.add(place(freshStart, 5, 5, 80, 20));
+        previewPane.add(prefSize(freshStart, 80, 20));
 
         JButton applyButton = new JButton("Apply");
-        previewPane.add(place(applyButton, 90, 5, 70, 22));
-        applyButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                save();
-            }
-        });
+        previewPane.add(prefSize(applyButton, 70, 22));
+        applyButton.addActionListener(e -> save());
 
         JButton refreshButton = new JButton("Refresh sprite files");
-        previewPane.add(place(refreshButton, 205, 5, 130, 22));
-        refreshButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                reload();
-            }
-        });
+        previewPane.add(prefSize(refreshButton, 130, 22));
+        refreshButton.addActionListener(e -> loadSprites());
 
         imageView = new JLabel();
-        previewPane.add(place(imageView, 0, 30, 300, 270));
+        previewPane.add(prefSize(imageView, 300, 270));
 
-        JPanel bottomPane = new JPanel();
-        bottomPane.setLayout(new BoxLayout(bottomPane, BoxLayout.X_AXIS));
-        //bottomPane.setBackground(new Color(0f,0f,0.6f));
-        add(bottomPane);
-        bottomPane.add(new JButton("mooooooooooooooooooooooooo"));
-        bottomPane.add(new JButton("mooooooooooooooooooooooooo"));
+        JPanel bottomPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        if (debug) bottomPane.setBackground(new Color(0f, 1f, 0f));
+        add(prefSize(bottomPane, 700, 220), BorderLayout.PAGE_END);
 
-        //GridBagConstraints constraints = new GridBagConstraints(5, 10, 25, 8, 1.0, 0.25, GridBagConstraints.HORIZONTAL, 2, new Insets(5, 10, 25, 30), 40, 69);
-        //layout.setConstraints(panel1, constraints);
+        bottomPane.add(prefSize(new JLabel("   Console"), 666, 20));
 
-        //panel2.add(butt);
+        console = new JTextArea();
+        console.setLineWrap(true);
+        console.setEditable(false);
+        console.setFont(console.getFont().deriveFont(11f));
+        //consoleScroll = new JScrollPane(prefSize(console, 660, 160) , JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        consoleScroll = new JScrollPane(console, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        if (debug) consoleScroll.setBackground(new Color(1f,0f,1f));
+        bottomPane.add(prefSize(consoleScroll, 680, 180));
 
 
+        //consoleScroll.add(prefSize(console, 660, 160));
+        console.append(":)");
 
-        //add(mainPanel);
     }
 
-    /*public void paintComponent(Graphics g) {
+    private void loadSprites() {
         try {
-            g.drawImage(imageView, 300, 80, 600, 380, null);
-        } catch (Exception ex) {
+            info("Loading sprites from disk...");
+            String selectedSprite = spriteList.getSelectedValue();
+            String selectedVariant = variantList.getSelectedValue();
+            sprites.clear();
+            spriteList.clear();
+            variantList.clear();
 
-        }
-    }*/
+            Path thisDir = Paths.get(spritesPath);
+            Path[] spriteFiles = listFiles(thisDir);
 
-
-
-    public void reload() {
-        sprites.clear();
-        spriteList.clear();
-        variantList.clear();
-
-        Path thisDir = Paths.get(cwd);
-        Path[] spriteFiles = listFiles(thisDir);
-
-        /*imageView.fitWidthProperty().bind(imagePane.widthProperty());
-        imageView.fitHeightProperty().bind(imagePane.heightProperty());*/
-
-        // Get all sprite options
-        for (Path spriteFile : spriteFiles) {
-            String spriteName = spriteFile.getFileName().toString();
-            Sprite newSprite = new Sprite().setLabel(spriteName);
-
-            // Get variations of sprite
-            try {
-                Path[] variants = listFiles(spriteFile);
-                for (Path variant : variants) {
-                    String variantName = variant.getFileName().toString();
-                    Variant newVariant = new Variant().setName(variantName);
-
-                    // Get images of variation
-                    try {
-                        Path[] spritesheets = listFiles(variant);
-                        HashMap<String, BufferedImage> spritesheetImages = new HashMap<>();
-                        HashMap<String,BufferedImage> spritesheetMasks = new HashMap<>();
-                        for (Path spritesheet : spritesheets) {
-                            String filename = spritesheet.getFileName().toString();
-                            if (filename.toLowerCase().endsWith("-mask.png")) {
-                                spritesheetMasks.put(filename.toLowerCase().replace("-mask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
-                            } else if (filename.toLowerCase().endsWith(".png")){
-                                spritesheetImages.put(filename.toLowerCase().replace(".png", ""), ImageIO.read(new File(spritesheet.toUri())));
-                            }
-                        }
-                        newVariant.addImages(spritesheetImages);
-                        newVariant.addMasks(spritesheetMasks);
-
-                        newSprite.addVariant(newVariant.name, newVariant);
-
-                        sprites.put(newSprite.label, newSprite);
-                    } catch (Exception ex) {
-                        System.err.println("Guh...");
-                        ex.printStackTrace();
-                    }
+            // Get all sprite options
+            for (Path spriteFile : spriteFiles) {
+                if (!Files.isDirectory(spriteFile)) {
+                    info("Skipping non-directory spriteFile: " + spriteFile.toString());
+                    continue;
                 }
-            } catch (Exception ex) {
-                // heck
-                System.err.println("Sprite messed up somehow");
-                ex.printStackTrace();
-            }
-        }
+                String spriteName = spriteFile.getFileName().toString();
+                Sprite newSprite = new Sprite().setLabel(spriteName);
 
-        for (String key : sprites.keySet()) {
-            spriteList.add(key);
+                // Get variations of sprite
+                try {
+                    Path[] variants = listFiles(spriteFile);
+                    for (Path variant : variants) {
+                        if (!Files.isDirectory(variant)) {
+                            info("Skipping non-directory variant: " + variant.toString());
+                            continue;
+                        }
+                        String variantName = variant.getFileName().toString();
+                        Variant newVariant = new Variant().setName(variantName);
+
+                        // Get images of variation
+                        try {
+                            Path[] spritesheets = listFiles(variant);
+                            HashMap<String, BufferedImage> spritesheetImages = new HashMap<>();
+                            HashMap<String, BufferedImage> spritesheetMasks = new HashMap<>();
+                            for (Path spritesheet : spritesheets) {
+                                String filename = spritesheet.getFileName().toString();
+                                if (filename.toLowerCase().endsWith("-mask.png")) {
+                                    spritesheetMasks.put(filename.toLowerCase().replace("-mask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
+                                } else if (filename.toLowerCase().endsWith(".png")) {
+                                    spritesheetImages.put(filename.toLowerCase().replace(".png", ""), ImageIO.read(new File(spritesheet.toUri())));
+                                }
+                            }
+                            newVariant.addImages(spritesheetImages);
+                            newVariant.addMasks(spritesheetMasks);
+
+                            newSprite.addVariant(newVariant.name, newVariant);
+
+                            sprites.put(newSprite.label, newSprite);
+                        } catch (Exception ex) {
+                            System.err.println("Guh...");
+                            ex.printStackTrace();
+                        }
+                    }
+                } catch (Exception ex) {
+                    System.err.println("Sprite messed up somehow");
+                    ex.printStackTrace();
+                }
+            }
+
+            for (String key : sprites.keySet()) {
+                spriteList.add(key);
+            }
+            if (null != selectedSprite) {
+                spriteList.setSelectedValue(selectedSprite, true);
+                spriteList.getListSelectionListeners()[0].valueChanged(new ListSelectionEvent(this, 0, 0, true));
+                if (null != selectedVariant) {
+                    variantList.setSelectedValue(selectedVariant, true);
+                    variantList.getListSelectionListeners()[0].valueChanged(new ListSelectionEvent(this, 0, 0, true));
+                }
+            }
+            info("Loading complete!");
+        }
+        catch (Exception ex) {
+            error("loadSprites failed in a major way.", ex);
         }
     }
 
-    public Component place(Component component, int x, int y, int w, int h) {
-        component.setBounds(x, y, w, h);
+    // Garbo method for lazy UI placement. Will probably kill soome time soon
+//    public Component place(Component component, int x, int y, int w, int h) {
+//        component.setBounds(x, y, w, h);
+//        return component;
+//    }
+
+    private Component prefSize(Component component, int w, int h) {
+        component.setPreferredSize(new Dimension(w, h));
+        /*component.setMaximumSize(new Dimension(w, h));
+        component.setMinimumSize(new Dimension(w, h));*/
         return component;
     }
 
@@ -314,7 +325,7 @@ public class MainPanel extends JPanel {
      * Tweaked after ripping from thezerothcat's LM Rando
      * https://github.com/thezerothcat/LaMulanaRandomizer/blob/master/src/main/java/lmr/randomizer/Settings.java
      */
-    public void guessInstallLocation() {
+    private void guessInstallLocation() {
         String laMulanaBaseDir = "";
 
         for (String filename : Arrays.asList(
@@ -340,9 +351,14 @@ public class MainPanel extends JPanel {
                 , "$HOME/.local/share/Steam/steamapps/common/La-Mulana"
                 , "~/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/common/La-Mulana"
         )) {
-            if (new File(filename).exists()) {
-                laMulanaBaseDir = filename;
-                break;
+            try {
+                if (new File(filename).exists()) {
+                    laMulanaBaseDir = filename;
+                    break;
+                }
+            } catch (Exception ex) {
+                System.err.println("Something broke up while trying to find the game directory");
+                ex.printStackTrace();
             }
         }
 
@@ -390,11 +406,11 @@ public class MainPanel extends JPanel {
         }
     }
 
-    public String path() {
+    private String path() {
         return installDirBox.getText() + File.separator + graphicsPath;
     }
 
-    public HashMap<String, BufferedImage> generateImages(Variant variant) {
+    private HashMap<String, BufferedImage> generateImages(Variant variant) {
         HashMap<String, BufferedImage> images = new HashMap<>();
 
         for (String key : variant.spritesheetImages.keySet()) {
@@ -409,11 +425,11 @@ public class MainPanel extends JPanel {
         return images;
     }
 
-    public BufferedImage generateImage(Variant variant, String key) throws IOException {
+    private BufferedImage generateImage(Variant variant, String key) throws IOException {
         BufferedImage newImage = ImageIO.read(new File(path() + File.separator + key + extension));
-        /*if (freshStart.isSelected()) {
-            newImage = copyImage(sprites.get(firstList.getSelectionModel().getSelectedItem()).variants.get("DEFAULT").spritesheetImages.get(key));
-        }*/
+        if (freshStart.isSelected()) {
+            newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(key));
+        }
         BufferedImage replacement = variant.spritesheetImages.get(key);
         BufferedImage mask = variant.spritesheetMasks.get(key);
 
@@ -437,9 +453,6 @@ public class MainPanel extends JPanel {
                     else if (new Color(mask.getRGB(x, y)).getBlue() != 0) {
                         newImage.setRGB(x, y, transparent.getRGB());
                     }
-                    // Leave this pixel alone
-                    else {
-                    }
                 }
             }
         }
@@ -458,7 +471,7 @@ public class MainPanel extends JPanel {
         return null;
     }
 
-    public BufferedImage copyImage(BufferedImage source){
+    private BufferedImage copyImage(BufferedImage source){
         BufferedImage b = new BufferedImage(source.getWidth(), source.getHeight(), source.getType());
         Graphics g = b.getGraphics();
         g.drawImage(source, 0, 0, null);
@@ -466,26 +479,74 @@ public class MainPanel extends JPanel {
         return b;
     }
 
-    public void save() {
-        if (installDirBox.getText().trim().length() == 0 || !Files.exists(Paths.get(path()))) {
-            installDirBox.setBackground(new Color(1.0f, 0.7f, 0.7f));
-            return;
-        } else {
-            installDirBox.setBackground(new Color(1.0f, 1.0f, 1.0f));
-        }
-
-        HashMap<String, BufferedImage> images = generateImages(
-                sprites.get(spriteList.getSelectedValue())
-                        .variants.get(variantList.getSelectedValue()));
-        for (String key : images.keySet()) {
-            try {
-                ImageIO.write(images.get(key), "png", new File(path() + File.separator + key + extension));
-            } catch (Exception ex) {
-                System.err.println("Failed to write a file");
-                ex.printStackTrace();
+    private void save() {
+        try {
+            info("Trying to save changes");
+            if (installDirBox.getText().trim().length() == 0 || !Files.exists(Paths.get(path()))) {
+                installDirBox.setBackground(new Color(1.0f, 0.7f, 0.7f));
+                warn("Failed to locate graphics directory at: " + path());
+                return;
+            } else {
+                installDirBox.setBackground(new Color(1.0f, 1.0f, 1.0f));
             }
+
+            HashMap<String, BufferedImage> images = generateImages(
+                    sprites.get(spriteList.getSelectedValue())
+                            .variants.get(variantList.getSelectedValue()));
+            for (String key : images.keySet()) {
+                try {
+                    ImageIO.write(images.get(key), "png", new File(path() + File.separator + key + extension));
+                } catch (Exception ex) {
+                    System.err.println("Failed to write a file");
+                    ex.printStackTrace();
+                }
+            }
+
+            info("That save probably worked!");
         }
+        catch (Exception ex) {
+            error("Save failed :(", ex);
+        }
+    }
 
+    private void info(String s) {
+        System.out.println(s);
+        console("[INFO]  " + s, 6);
+    }
 
+    private void warn(String s) {
+        System.err.println(s);
+        console("[WARN]  " + s, 4);
+    }
+
+    private void error(String s, @Nullable Exception ex) {
+        System.err.println(s);
+        console("[ERROR] " + s, 3);
+        if (null != ex) {
+            ex.printStackTrace();
+
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            ex.printStackTrace(pw);
+            console(sw.toString() + "\n", 3);
+        }
+    }
+
+    private void console(String s, int level) {
+        if (level <= LOG_LEVEL) {
+            console.append("\n" + s);
+
+            // TODO: Clear out old stuff to avoid memory leaks
+//            if (console.getText().length() > 2048) {
+//
+//            }
+
+            // TODO: Only scroll if scrolled to the end
+//            JScrollBar scroll = consoleScroll.getVerticalScrollBar();
+//            scroll.revalidate();
+//            System.out.println(scroll.getValue() + " / " + scroll.getMaximum());
+            console.setCaretPosition(console.getDocument().getLength());
+
+        }
     }
 }
