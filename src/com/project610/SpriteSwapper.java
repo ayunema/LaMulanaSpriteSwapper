@@ -12,12 +12,13 @@ public class SpriteSwapper {
             ex.printStackTrace();
         }
         JFrame jf = new JFrame("La-Mulana Sprite Swapper");
-        jf.setSize(700, 580);
+        jf.setSize(100, 100);
+        jf.setMinimumSize(new Dimension(710, 591));
         MainPanel mainPanel = new MainPanel(args);
         mainPanel.setBackground(new Color(230, 230,230));
         jf.setContentPane(mainPanel);
         jf.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        jf.setResizable(false);
+        //jf.setResizable(false);
         jf.setVisible(true);
     }
 }
