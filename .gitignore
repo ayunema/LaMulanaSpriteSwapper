@@ -4,6 +4,7 @@ out/
 *.psd
 *.iml
 00_BAK/
+zip.lnk
 
 # Compiled class file
 *.class

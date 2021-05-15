@@ -41,7 +41,10 @@ class MainPanel extends JPanel {
 
     private HashMap<String,Sprite> sprites = new HashMap<>();
 
-    MainPanel(String[] args) {
+    private JFrame parent;
+
+    MainPanel(String[] args, JFrame parent) {
+        this.parent = parent;
         init();
 
         if (installDirBox.getText().trim().isEmpty()) {
@@ -81,8 +84,6 @@ class MainPanel extends JPanel {
         JPanel spriteListPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
         if (debug) spriteListPane.setBackground(new Color(0.3f, 0.3f, 0.6f));
         spriteListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
-        //midPane.add(prefSize(spriteListPane, 170, 300));
-        //midPane.add(spriteListPane, BorderLayout.LINE_START);
         midPane.add(prefSize(spriteListPane, 170, 300), BorderLayout.LINE_START);
 
         spriteListPane.add(prefSize(new JLabel("   Sprite"), 170, 20));
@@ -103,8 +104,6 @@ class MainPanel extends JPanel {
         JPanel variantListPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
         if (debug) variantListPane.setBackground(new Color(0.4f, 0.4f, 0.8f));
         variantListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
-        //midPane.add(prefSize(variantListPane, 170, 300));
-        //midPane.add(variantListPane, BorderLayout.CENTER);
         midPane.add(prefSize(variantListPane, 170, 300), BorderLayout.CENTER);
 
         variantListPane.add(prefSize(new JLabel("   Variant"), 170, 20));
@@ -193,14 +192,14 @@ class MainPanel extends JPanel {
         midPane.add(prefSize(previewPane, 350, 300), BorderLayout.LINE_END);
 
         freshStart = new JCheckBox("Fresh start", true);
-        previewPane.add(prefSize(freshStart, 80, 20));
+        previewPane.add(prefSize(freshStart, 100, 20));
 
         JButton applyButton = new JButton("Apply");
         previewPane.add(prefSize(applyButton, 70, 22));
         applyButton.addActionListener(e -> save());
 
         JButton refreshButton = new JButton("Refresh sprite files");
-        previewPane.add(prefSize(refreshButton, 130, 22));
+        previewPane.add(prefSize(refreshButton, 150, 22));
         refreshButton.addActionListener(e -> loadSprites());
 
         imageView = new JLabel();
@@ -221,14 +220,15 @@ class MainPanel extends JPanel {
         if (debug) consoleScroll.setBackground(new Color(1f,0f,1f));
         bottomPane.add(prefSize(consoleScroll, 680, 180));
 
-
-        //consoleScroll.add(prefSize(console, 660, 160));
         console.append(":)");
 
     }
 
     private void loadSprites() {
         try {
+            Dimension dim = parent.getMinimumSize();
+            //dim.setSize(dim.width*1.1, dim.height*1.3);
+            parent.setMinimumSize(dim);
             info("Loading sprites from disk...");
             String selectedSprite = spriteList.getSelectedValue();
             String selectedVariant = variantList.getSelectedValue();
@@ -315,8 +315,6 @@ class MainPanel extends JPanel {
 
     private Component prefSize(Component component, int w, int h) {
         component.setPreferredSize(new Dimension(w, h));
-        /*component.setMaximumSize(new Dimension(w, h));
-        component.setMinimumSize(new Dimension(w, h));*/
         return component;
     }
 
