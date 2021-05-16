@@ -1,7 +1,7 @@
 package com.project610;
 
-import com.project610.utils.JList2;
-import com.sun.istack.internal.Nullable;
+import com.project610.structs.JList2;
+import org.jetbrains.annotations.Nullable;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -19,7 +19,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 
 class MainPanel extends JPanel {
 
@@ -32,20 +31,36 @@ class MainPanel extends JPanel {
     private JScrollPane consoleScroll;
 
     private String graphicsPath = "data" + File.separator + "graphics" + File.separator + "00";
-    private String spritesPath = "sprites";
+    private String spritesDirName = "sprites";
+    private Path spritesPath;
     private String extension = ".png";
+    final private String THUMBNAIL_NAME = "thumbnail";
 
     private boolean debug = false;
+    private boolean inIDE = true;
 
     private int LOG_LEVEL = 6; // 3 err, 4 warn, 6 info, 7 debug
 
     private HashMap<String,Sprite> sprites = new HashMap<>();
 
-    MainPanel(String[] args) {
+    private JFrame parent;
+
+    MainPanel(String[] args, JFrame parent) {
+        this.parent = parent;
+        try {
+            if (MainPanel.class.getClassLoader().getResource("MainPanel.class").toURI().getScheme().equalsIgnoreCase("jar")) {
+                inIDE = false;
+            }
+        } catch (Exception ex) {
+            // Meh
+        }
+
         init();
 
+        // TODO: Load base directory from stored settings
+        // TODO: Store settings
         if (installDirBox.getText().trim().isEmpty()) {
-            guessInstallLocation();
+            installDirBox.setText(Utils.guessInstallLocation(this));
         }
 
         loadSprites();
@@ -63,7 +78,7 @@ class MainPanel extends JPanel {
         topPane.setLayout(new FlowLayout(FlowLayout.LEFT));
         add(prefSize(topPane, 700, 30), BorderLayout.PAGE_START);
 
-        topPane.add(prefSize(new JLabel("La-Mulana install directory"), 135, 20));
+        topPane.add(prefSize(new JLabel("La-Mulana install directory"), 155, 20));
 
         installDirBox = new JTextField(40);
         topPane.add(prefSize(installDirBox, 400, 20));
@@ -81,8 +96,6 @@ class MainPanel extends JPanel {
         JPanel spriteListPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
         if (debug) spriteListPane.setBackground(new Color(0.3f, 0.3f, 0.6f));
         spriteListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
-        //midPane.add(prefSize(spriteListPane, 170, 300));
-        //midPane.add(spriteListPane, BorderLayout.LINE_START);
         midPane.add(prefSize(spriteListPane, 170, 300), BorderLayout.LINE_START);
 
         spriteListPane.add(prefSize(new JLabel("   Sprite"), 170, 20));
@@ -103,8 +116,6 @@ class MainPanel extends JPanel {
         JPanel variantListPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
         if (debug) variantListPane.setBackground(new Color(0.4f, 0.4f, 0.8f));
         variantListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
-        //midPane.add(prefSize(variantListPane, 170, 300));
-        //midPane.add(variantListPane, BorderLayout.CENTER);
         midPane.add(prefSize(variantListPane, 170, 300), BorderLayout.CENTER);
 
         variantListPane.add(prefSize(new JLabel("   Variant"), 170, 20));
@@ -121,13 +132,14 @@ class MainPanel extends JPanel {
 
             try {
                 // Ideally, a thumbnail will be provided to give an idea of what's being set
-                String spritesheetName = "thumbnail";
+                String spritesheetName = THUMBNAIL_NAME;
                 BufferedImage thumbnail;
                 try {
-                    thumbnail = currentVariant.spritesheetImages.get("thumbnail");
+                    thumbnail = currentVariant.spritesheetImages.get(THUMBNAIL_NAME);
                     thumbnail.getRGB(0,0);
                 }
                 // If there's no thumbnail, fall back on whatever first spritesheet we can find
+                // TODO: Maybe prioritize something, in some way, somehow
                 catch (Exception ex) {
                     for (String key : currentVariant.spritesheetImages.keySet()) {
                         spritesheetName = key;
@@ -135,44 +147,19 @@ class MainPanel extends JPanel {
                     }
                 }
 
-                // TODO: Cool duplicated code, bro
-                BufferedImage newImage;
-                if (freshStart.isSelected()) {
-                    newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(spritesheetName));
-                } else {
-                    newImage = ImageIO.read(new File(path() + File.separator + spritesheetName + ".png"));
-                }
-                BufferedImage replacement = currentVariant.spritesheetImages.get(spritesheetName);
-                BufferedImage mask = currentVariant.spritesheetMasks.get(spritesheetName);
-
-                Color transparent = new Color(0,0,0,0);
-
-                // If there's no mask, delete everything
-                if (null == mask) {
-                    newImage = replacement;
+                BufferedImage newImage = null;
+                if (spritesheetName.equalsIgnoreCase(THUMBNAIL_NAME)) {
+                        newImage = currentVariant.spritesheetImages.get(spritesheetName);
                 }
                 else {
-                    for (int y = 0; y < replacement.getHeight(); y++) {
-                        for (int x = 0; x < replacement.getWidth(); x++) {
-                            Color replacementColor = new Color(replacement.getRGB(x, y), true);
-                            int replacementAlpha = replacementColor.getAlpha();
-                            // Replace the pixel if it's not totally transparent
-                            if (replacementAlpha != 0) {
-                                newImage.setRGB(x, y, replacement.getRGB(x, y));
-                            }
-                            // If it was totally transparent, check if this is something that should be left alone
-                            // Delete areas where the mask colour is non-black
-                            else if (new Color(mask.getRGB(x, y)).getBlue() != 0) {
-                                newImage.setRGB(x, y, transparent.getRGB());
-                            }
-                        }
-                    }
+                    newImage = generateImage(currentVariant, spritesheetName);
                 }
 
+                // Scale image preview to fit imageView in previewPane
                 AffineTransform transform = new AffineTransform();
-                double scale = 1;
-                scale = Math.min(scale, (double)imageView.getWidth()/newImage.getWidth());
-                scale = Math.min(scale, (double)imageView.getHeight()/newImage.getHeight());
+                double scale = 2;
+                scale = Math.min(scale, (double)(imageView.getWidth() - 10)/newImage.getWidth());
+                scale = Math.min(scale, (double)(imageView.getHeight()- 20)/newImage.getHeight());
                 transform.scale(scale, scale);
                 AffineTransformOp transformOp = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
                 BufferedImage scaledImage = new BufferedImage((int)(newImage.getWidth()*scale),(int)(newImage.getHeight()*scale), BufferedImage.TYPE_INT_ARGB);
@@ -180,27 +167,25 @@ class MainPanel extends JPanel {
                 imageView.setIcon(new ImageIcon(scaledImage));
 
             } catch (Exception ex) {
-                System.err.println("Failed to display image");
-                ex.printStackTrace();
+                error("Failed to display image", ex);
             }
         });
 
         JPanel previewPane = new JPanel();
         if (debug) previewPane.setBackground(new Color(0.6f, 0.6f, 1.0f));
         previewPane.setLayout(new FlowLayout(FlowLayout.LEFT));
-        //midPane.add(prefSize(previewPane, 340, 300));
         midPane.add(previewPane, BorderLayout.LINE_END);
         midPane.add(prefSize(previewPane, 350, 300), BorderLayout.LINE_END);
 
         freshStart = new JCheckBox("Fresh start", true);
-        previewPane.add(prefSize(freshStart, 80, 20));
+        previewPane.add(prefSize(freshStart, 100, 20));
 
         JButton applyButton = new JButton("Apply");
         previewPane.add(prefSize(applyButton, 70, 22));
         applyButton.addActionListener(e -> save());
 
         JButton refreshButton = new JButton("Refresh sprite files");
-        previewPane.add(prefSize(refreshButton, 130, 22));
+        previewPane.add(prefSize(refreshButton, 150, 22));
         refreshButton.addActionListener(e -> loadSprites());
 
         imageView = new JLabel();
@@ -216,19 +201,20 @@ class MainPanel extends JPanel {
         console.setLineWrap(true);
         console.setEditable(false);
         console.setFont(console.getFont().deriveFont(11f));
-        //consoleScroll = new JScrollPane(prefSize(console, 660, 160) , JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         consoleScroll = new JScrollPane(console, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         if (debug) consoleScroll.setBackground(new Color(1f,0f,1f));
         bottomPane.add(prefSize(consoleScroll, 680, 180));
 
-
-        //consoleScroll.add(prefSize(console, 660, 160));
         console.append(":)");
-
     }
 
     private void loadSprites() {
+
         try {
+            // Ignore this. Proof of concept for re-scaling the window if I want to eventually allow minimizing the console
+//            Dimension dim = parent.getMinimumSize();
+//            dim.setSize(dim.width*1.1, dim.height*1.3);
+//            parent.setMinimumSize(dim);
             info("Loading sprites from disk...");
             String selectedSprite = spriteList.getSelectedValue();
             String selectedVariant = variantList.getSelectedValue();
@@ -236,8 +222,19 @@ class MainPanel extends JPanel {
             spriteList.clear();
             variantList.clear();
 
-            Path thisDir = Paths.get(spritesPath);
-            Path[] spriteFiles = listFiles(thisDir);
+            // First try to copy sprites folder to disk, so peeps can use their own private sprites
+            // (This should only be needed if running from a jar, as in-IDE, the resources should be properly copied to the target dir
+            try {
+                Path exportPath = Utils.exportResources("sprites", ".");
+                if (null != exportPath) {
+                    spritesPath = exportPath.normalize().toAbsolutePath();
+                }
+            } catch (Exception ex) {
+                error("Failed to write base sprites to disk", ex);
+            }
+
+            if (null == spritesPath) spritesPath = Utils.getFolderPath(spritesDirName);
+            Path[] spriteFiles = listFiles(spritesPath);
 
             // Get all sprite options
             for (Path spriteFile : spriteFiles) {
@@ -279,13 +276,11 @@ class MainPanel extends JPanel {
 
                             sprites.put(newSprite.label, newSprite);
                         } catch (Exception ex) {
-                            System.err.println("Guh...");
-                            ex.printStackTrace();
+                            error("Guh...", ex);
                         }
                     }
                 } catch (Exception ex) {
-                    System.err.println("Sprite messed up somehow");
-                    ex.printStackTrace();
+                    error("Sprite messed up somehow", ex);
                 }
             }
 
@@ -307,104 +302,13 @@ class MainPanel extends JPanel {
         }
     }
 
-    // Garbo method for lazy UI placement. Will probably kill soome time soon
-//    public Component place(Component component, int x, int y, int w, int h) {
-//        component.setBounds(x, y, w, h);
-//        return component;
-//    }
-
     private Component prefSize(Component component, int w, int h) {
         component.setPreferredSize(new Dimension(w, h));
-        /*component.setMaximumSize(new Dimension(w, h));
-        component.setMinimumSize(new Dimension(w, h));*/
         return component;
     }
 
 
-    /**
-     * Tweaked after ripping from thezerothcat's LM Rando
-     * https://github.com/thezerothcat/LaMulanaRandomizer/blob/master/src/main/java/lmr/randomizer/Settings.java
-     */
-    private void guessInstallLocation() {
-        String laMulanaBaseDir = "";
 
-        for (String filename : Arrays.asList(
-                  "C:\\Games\\La-Mulana Remake 1.3.3.1"
-                , "C:\\GOG Games\\La-Mulana"
-                , "C:\\GOG Games\\La-Mulana"
-                , "C:\\Steam\\steamapps\\common\\La-Mulana"
-                , "C:\\Program Files (x86)\\Steam\\steamapps\\common\\La-Mulana"
-                , "C:\\Program Files\\Steam\\steamapps\\common\\La-Mulana"
-                , "C:\\Program Files (x86)\\GOG Galaxy\\Games\\La Mulana"
-                , "C:\\Program Files (x86)\\GOG.com\\La-Mulana"
-
-                , "D:\\Games\\La-Mulana Remake 1.3.3.1"
-                , "D:\\GOG Games\\La-Mulana"
-                , "D:\\GOG Games\\La-Mulana"
-                , "D:\\Steam\\steamapps\\common\\La-Mulana"
-                , "D:\\Program Files (x86)\\Steam\\steamapps\\common\\La-Mulana"
-                , "D:\\Program Files\\Steam\\steamapps\\common\\La-Mulana"
-                , "D:\\Program Files (x86)\\GOG Galaxy\\Games\\La Mulana"
-                , "D:\\Program Files (x86)\\GOG.com\\La-Mulana"
-
-                , "$HOME/.steam/steam/steamapps/common/La-Mulana"
-                , "$HOME/.local/share/Steam/steamapps/common/La-Mulana"
-                , "~/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/common/La-Mulana"
-        )) {
-            try {
-                if (new File(filename).exists()) {
-                    laMulanaBaseDir = filename;
-                    break;
-                }
-            } catch (Exception ex) {
-                System.err.println("Something broke up while trying to find the game directory");
-                ex.printStackTrace();
-            }
-        }
-
-        if (laMulanaBaseDir.isEmpty()) {
-            try {
-                // Try to find the GOG game on Linux
-                // Also honor file system hierachy (local installs supersede global installs)
-                for (String menu_entry_file_path : Arrays.asList(
-                          "/usr/share/applications/gog_com-La_Mulana_1.desktop"
-                        , "/usr/local/share/applications/gog_com-La_Mulana_1.desktop"
-                        , System.getProperty("user.home") + "/.local/share/applications/gog_com-La_Mulana_1.desktop"
-                        , System.getProperty("user.home") + "/Desktop/gog_com-La_Mulana_1.desktop"
-                        /* other valid paths for the .desktop file to be located? */)) {
-
-                    File menu_entry_file = new File(menu_entry_file_path);
-                    if (!menu_entry_file.exists()) {
-                        continue; // Try next item if file doesn't exist
-                    }
-
-                    List<String> menu_file_lines = Files.readAllLines(menu_entry_file.toPath());
-                    menu_file_lines.removeIf(l -> !l.startsWith("Path="));
-
-                    if (menu_file_lines.size() != 1) {
-                        continue; // File is malformed, there should be exactly one "Path=..." line
-                    }
-
-                    laMulanaBaseDir = menu_file_lines.get(0).substring(5);
-                }
-
-                // The GOG version has some fluff around the *actual* game install, moving it into the
-                // "game" subdirectory. If it exists, then just use that, otherwise the rcdReader won't
-                // be able to find the necessary files!
-                File dir = new File(laMulanaBaseDir, "game");
-                if (dir.exists() && dir.isDirectory()) {
-                    laMulanaBaseDir += "/game";
-                }
-            } catch (Exception e) {
-                // do nothing
-            }
-        }
-
-
-        if (!laMulanaBaseDir.isEmpty()) {
-            installDirBox.setText(laMulanaBaseDir);
-        }
-    }
 
     private String path() {
         return installDirBox.getText() + File.separator + graphicsPath;
@@ -415,10 +319,12 @@ class MainPanel extends JPanel {
 
         for (String key : variant.spritesheetImages.keySet()) {
             try {
+                if (key.equalsIgnoreCase(THUMBNAIL_NAME)) {
+                    continue;
+                }
                 images.put(key, generateImage(variant, key));
             } catch (Exception ex) {
-                System.err.println("Failed to generate image");
-                ex.printStackTrace();
+                error("Failed to generate image", ex);
             }
         }
 
@@ -465,8 +371,7 @@ class MainPanel extends JPanel {
             return Arrays.copyOf(files, files.length, Path[].class);
         }
         catch (Exception ex) {
-            System.err.println("Fffff- Failed to list files in: " + path);
-            ex.printStackTrace();
+            error("Fffff- Failed to list files in: " + path, ex);
         }
         return null;
     }
@@ -495,10 +400,13 @@ class MainPanel extends JPanel {
                             .variants.get(variantList.getSelectedValue()));
             for (String key : images.keySet()) {
                 try {
+                    if (key.equalsIgnoreCase(THUMBNAIL_NAME)) {
+                        System.out.println("Skipping thumbnail");
+                        continue;
+                    }
                     ImageIO.write(images.get(key), "png", new File(path() + File.separator + key + extension));
                 } catch (Exception ex) {
-                    System.err.println("Failed to write a file");
-                    ex.printStackTrace();
+                    error("Failed to write a file. If `Fresh start` is unchecked, does the file exist in your game's graphics directory?", ex);
                 }
             }
 
@@ -509,17 +417,17 @@ class MainPanel extends JPanel {
         }
     }
 
-    private void info(String s) {
+    public void info(String s) {
         System.out.println(s);
         console("[INFO]  " + s, 6);
     }
 
-    private void warn(String s) {
+    public void warn(String s) {
         System.err.println(s);
         console("[WARN]  " + s, 4);
     }
 
-    private void error(String s, @Nullable Exception ex) {
+    public void error(String s, @Nullable Exception ex) {
         System.err.println(s);
         console("[ERROR] " + s, 3);
         if (null != ex) {

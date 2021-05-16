@@ -1,4 +1,4 @@
-package com.project610.utils;
+package com.project610.structs;
 
 import javax.swing.*;
 import java.util.ArrayList;
