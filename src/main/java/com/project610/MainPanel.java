@@ -17,16 +17,29 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Set;
 
 class MainPanel extends JPanel {
+
+    // This isn't great, but it works for now
+    private final int SHUFFLE_NORMAL = 0;
+    private final int SHUFFLE_HUE_IGNORE = 100;
+    private final int SHUFFLE_SATURATION_IGNORE = 200;
+    private final int SHUFFLE_SATURATION_ONLY_DOWN = 201;
+    private final int SHUFFLE_SATURATION_ONLY_UP = 202;
+    private final int SHUFFLE_BRIGHTNESS_IGNORE = 300;
+    private final int SHUFFLE_BRIGHTNESS_ONLY_DOWN = 301;
+    private final int SHUFFLE_BRIGHTNESS_ONLY_UP = 302;
 
     private JTextField installDirBox;
     private JList2<String> spriteList;
     private JList2<String> variantList;
     private JCheckBox freshStart;
     private JCheckBox shuffleColorsBox;
+    private JCheckBox chaosShuffleBox;
     private JLabel imageView;
     private JTextArea console;
     private JScrollPane consoleScroll;
@@ -207,9 +220,13 @@ class MainPanel extends JPanel {
         refreshButton.addActionListener(e -> loadSprites()); // TODO: Make this work in-IDE again (Probably after changing packaged sprites to a download)
         previewPane.add(prefSize(refreshButton, 150, 22));
 
-        shuffleColorsBox = new JCheckBox("Shuffle colours*", false);
+        shuffleColorsBox = new JCheckBox("Shuffle colours", false);
         shuffleColorsBox.setToolTipText("Will randomize colours if the variant has a colour mask (eg: `00prof-COLORMASK.png`)");
         previewPane.add(prefSize(shuffleColorsBox, 120, 22));
+
+        chaosShuffleBox = new JCheckBox("Chaos shuffle", false);
+        chaosShuffleBox.setToolTipText("Will NOT try to keep consistency between spritesheets in a variant)");
+        previewPane.add(prefSize(chaosShuffleBox, 120, 22));
 
 
 
@@ -226,7 +243,10 @@ class MainPanel extends JPanel {
         if (debug) bottomPane.setBackground(new Color(0f, 1f, 0f));
         add(prefSize(bottomPane, 700, 220), BorderLayout.PAGE_END);
 
-        bottomPane.add(prefSize(new JLabel("   Console"), 666, 20));
+        bottomPane.add(prefSize(new JLabel("   Console"), 80, 20));
+        JButton clearConsoleButton = new JButton("x");
+        bottomPane.add(clearConsoleButton);
+        clearConsoleButton.addActionListener(e -> console.setText(""));
 
         console = new JTextArea();
         console.setLineWrap(true);
@@ -483,11 +503,16 @@ class MainPanel extends JPanel {
 
 
     private BufferedImage generateImageForVariant2(Variant variant, String key) throws IOException {
-        info("Generate image: " + variant.name + "/" + key);
-        info("Exists? " + Files.exists(Paths.get(path() + File.separator + key + extension)));
-        BufferedImage newImage = ImageIO.read(new File(path() + File.separator + key + extension));
+        info("Generating image: " + path() + File.separator + key + extension);
+        BufferedImage newImage = null;
         if (freshStart.isSelected()) {
             newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(key));
+        } else {
+            try {
+                newImage = ImageIO.read(new File(path() + File.separator + key + extension));
+            } catch (Exception ex) {
+                error("Could not find/load base image at: " + path() + File.separator + key + extension, ex);
+            }
         }
         BufferedImage replacement = variant.spritesheetImages.get(key);
         BufferedImage mask = variant.spritesheetMasks.get(key);
@@ -497,9 +522,17 @@ class MainPanel extends JPanel {
 
         // If there's no mask, delete everything
         if (null == mask) {
-            newImage = replacement;
+            newImage = copyImage(replacement);
         }
         if (null != mask || shuffleColorsBox.isSelected()) {
+            if (chaosShuffleBox.isSelected()) {
+                newAdjustments();
+            }
+            int shuffleMods = 0;
+            if (Arrays.asList("01effect", "fog00", "fog01").contains(key.toLowerCase())) {
+                info("BRIGHTNESS ONLY DOWN for: " + key);
+                shuffleMods = SHUFFLE_BRIGHTNESS_ONLY_DOWN;
+            }
             for (int y = 0; y < replacement.getHeight(); y++) {
                 for (int x = 0; x < replacement.getWidth(); x++) {
                     Color replacementColor = new Color(replacement.getRGB(x, y), true);
@@ -508,7 +541,7 @@ class MainPanel extends JPanel {
                     if (replacementAlpha != 0) {
                         newImage.setRGB(x, y, replacement.getRGB(x, y));
                         if (shuffleColorsBox.isSelected()) {
-                            newImage.setRGB(x, y, shuffleRGB(x, y, replacement, colorMask));
+                            newImage.setRGB(x, y, shuffleRGB(x, y, replacement, colorMask, shuffleMods));
                         }
                     }
                     // If it was totally transparent, check if this is something that should be left alone
@@ -526,13 +559,56 @@ class MainPanel extends JPanel {
     }
 
     private int shuffleRGB(int x, int y, BufferedImage img, BufferedImage colorMask) {
+        return shuffleRGB(x, y, img, colorMask, SHUFFLE_NORMAL);
+    }
+
+    private int shuffleRGB(int x, int y, BufferedImage img, BufferedImage colorMask, int mods) {
 
         int transparent = new Color(0,0,0,0).getRGB();
 
-        Color maskPixel = (null == colorMask) ? null : new Color(colorMask.getRGB(x, y), true);
         Color pixel = new Color(img.getRGB(x, y),true);
+        Color maskPixel = (null == colorMask) ? null : new Color(colorMask.getRGB(x, y), true);
+
+        // Add new randomized adjustment if this maskPixel is a colour not yet seen for this variant
+        float h = (float)Math.random();
+        float s = (float)Math.random()*0.72f-0.36f;
+        float b = (float)Math.random()*0.5f-0.25f;
+
+        switch (mods) {
+            case SHUFFLE_SATURATION_IGNORE:
+                s = 0;
+                break;
+            case SHUFFLE_SATURATION_ONLY_DOWN:
+                s = (float)Math.random()*0.36f-0.36f;
+                break;
+            case SHUFFLE_SATURATION_ONLY_UP:
+                s =(float)Math.random()*0.36f;
+                break;
+            case SHUFFLE_BRIGHTNESS_IGNORE:
+                b = 0;
+                break;
+            case SHUFFLE_BRIGHTNESS_ONLY_DOWN:
+                b = (float)Math.random()*0.25f-0.25f;
+                break;
+            case SHUFFLE_BRIGHTNESS_ONLY_UP:
+                b =(float)Math.random()*0.25f;
+                break;
+        }
+
+        if (null == adjustments.get(maskPixel)) {
+            adjustments.put(maskPixel,
+                    new Float[] {h, s, b});
+        }
+
         if (pixel.getRGB() != transparent && (null == maskPixel || maskPixel.getRGB() != transparent)) {
-            return adjustPixelColor(pixel.getRGB(), adjustments.get(maskPixel));
+            try {
+                return adjustPixelColor(pixel.getRGB(), adjustments.get(maskPixel));
+            } catch (Exception ex) {
+                error("Something broke shuffling RGB at (" + x + "," + y + ")\n" +
+                        "        pixel="+pixel +"\n"+
+                        "    maxkPixel=" +maskPixel+"\n"+
+                        "  adjustments="+adjustments.get(maskPixel), ex);
+            }
         }
         return img.getRGB(x, y);
     }

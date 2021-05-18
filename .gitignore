@@ -1,11 +1,14 @@
-# Stuff
+# IDE Stuff
 .idea
 out/
-*.psd
 *.iml
+target/
+
+# Virus610 stuff
 00_BAK/
 zip.lnk
-target/
+*.aseprite
+*.psd
 
 # Compiled class file
 *.class
