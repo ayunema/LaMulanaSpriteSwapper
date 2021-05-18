@@ -26,6 +26,7 @@ class MainPanel extends JPanel {
     private JList2<String> spriteList;
     private JList2<String> variantList;
     private JCheckBox freshStart;
+    private JCheckBox shuffleColorsBox;
     private JLabel imageView;
     private JTextArea console;
     private JScrollPane consoleScroll;
@@ -42,6 +43,7 @@ class MainPanel extends JPanel {
     private int LOG_LEVEL = 6; // 3 err, 4 warn, 6 info, 7 debug
 
     private HashMap<String,Sprite> sprites = new HashMap<>();
+    HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
 
     private JFrame parent;
 
@@ -130,6 +132,8 @@ class MainPanel extends JPanel {
             Sprite currentSprite = sprites.get(spriteList.getSelectedValue());
             Variant currentVariant = currentSprite.variants.get(variantList.getSelectedValue());
 
+            newAdjustments();
+
             try {
                 // Ideally, a thumbnail will be provided to give an idea of what's being set
                 String spritesheetName = THUMBNAIL_NAME;
@@ -141,9 +145,22 @@ class MainPanel extends JPanel {
                 // If there's no thumbnail, fall back on whatever first spritesheet we can find
                 // TODO: Maybe prioritize something, in some way, somehow
                 catch (Exception ex) {
-                    for (String key : currentVariant.spritesheetImages.keySet()) {
-                        spritesheetName = key;
-                        break;
+                    try {
+                        if (currentSprite.label.equalsIgnoreCase("lemeza")) {
+                            spritesheetName = "00prof";
+                        }
+                        else if (currentSprite.label.equalsIgnoreCase("tiamat")) {
+                            spritesheetName = "b07";
+                        }
+                        else {
+                            // Surely this is bad practice
+                            throw new Exception();
+                        }
+                    } catch (Exception ex2) {
+                        for (String key : currentVariant.spritesheetImages.keySet()) {
+                            spritesheetName = key;
+                            break;
+                        }
                     }
                 }
 
@@ -152,7 +169,7 @@ class MainPanel extends JPanel {
                         newImage = currentVariant.spritesheetImages.get(spritesheetName);
                 }
                 else {
-                    newImage = generateImage(currentVariant, spritesheetName);
+                    newImage = generateImageForVariant2(currentVariant, spritesheetName);
                 }
 
                 // Scale image preview to fit imageView in previewPane
@@ -163,6 +180,7 @@ class MainPanel extends JPanel {
                 transform.scale(scale, scale);
                 AffineTransformOp transformOp = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
                 BufferedImage scaledImage = new BufferedImage((int)(newImage.getWidth()*scale),(int)(newImage.getHeight()*scale), BufferedImage.TYPE_INT_ARGB);
+
                 scaledImage = transformOp.filter(newImage, scaledImage);
                 imageView.setIcon(new ImageIcon(scaledImage));
 
@@ -178,15 +196,28 @@ class MainPanel extends JPanel {
         midPane.add(prefSize(previewPane, 350, 300), BorderLayout.LINE_END);
 
         freshStart = new JCheckBox("Fresh start", true);
-        previewPane.add(prefSize(freshStart, 100, 20));
+        freshStart.setToolTipText("Avoid overwriting previous changes, when possible");
+        previewPane.add(prefSize(freshStart, 90, 20));
 
         JButton applyButton = new JButton("Apply");
         previewPane.add(prefSize(applyButton, 70, 22));
         applyButton.addActionListener(e -> save());
 
         JButton refreshButton = new JButton("Refresh sprite files");
+        refreshButton.addActionListener(e -> loadSprites()); // TODO: Make this work in-IDE again (Probably after changing packaged sprites to a download)
         previewPane.add(prefSize(refreshButton, 150, 22));
-        refreshButton.addActionListener(e -> loadSprites());
+
+        shuffleColorsBox = new JCheckBox("Shuffle colours*", false);
+        shuffleColorsBox.setToolTipText("Will randomize colours if the variant has a colour mask (eg: `00prof-COLORMASK.png`)");
+        previewPane.add(prefSize(shuffleColorsBox, 120, 22));
+
+
+
+        /*JButton colorButton = new JButton("†");
+        previewPane.add(prefSize(colorButton, 10, 10));
+        colorButton.addActionListener(e -> {
+            imageView.getIcon()
+        });*/
 
         imageView = new JLabel();
         previewPane.add(prefSize(imageView, 300, 270));
@@ -208,6 +239,25 @@ class MainPanel extends JPanel {
         console.append(":)");
     }
 
+    // This was a test. It can probably be retired now.
+//    private BufferedImage screwWithColors(BufferedImage img) {
+//        BufferedImage newImage = copyImage(img);
+//        float adjustment = (float)Math.random();
+//
+//        for (int y = 0; y < newImage.getHeight(); y++) {
+//            for (int x = 0; x < newImage.getWidth(); x++) {
+//                Color pixel = new Color(newImage.getRGB(x,y), true);
+//                float[] hsb = Color.RGBtoHSB(pixel.getRed(), pixel.getGreen(), pixel.getBlue(), null);
+//                hsb[0] = (hsb[0] + adjustment);
+//                Color tempPixel = new Color(Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]));
+//                Color newPixel = new Color(tempPixel.getRed(), tempPixel.getGreen(), tempPixel.getBlue(), pixel.getAlpha());
+//                newImage.setRGB(x, y, newPixel.getRGB());
+//            }
+//        }
+//
+//        return newImage;
+//    }
+
     private void loadSprites() {
 
         try {
@@ -227,7 +277,8 @@ class MainPanel extends JPanel {
             try {
                 Path exportPath = Utils.exportResources("sprites", ".");
                 if (null != exportPath) {
-                    spritesPath = exportPath.normalize().toAbsolutePath();
+                    spritesPath = Paths.get(spritesDirName).normalize().toAbsolutePath();
+                    System.out.println(spritesPath);
                 }
             } catch (Exception ex) {
                 error("Failed to write base sprites to disk", ex);
@@ -256,21 +307,30 @@ class MainPanel extends JPanel {
                         String variantName = variant.getFileName().toString();
                         Variant newVariant = new Variant().setName(variantName);
 
+                        //info("Adding: " + newSprite.label + "/" + newVariant.name);
                         // Get images of variation
                         try {
                             Path[] spritesheets = listFiles(variant);
                             HashMap<String, BufferedImage> spritesheetImages = new HashMap<>();
                             HashMap<String, BufferedImage> spritesheetMasks = new HashMap<>();
+                            HashMap<String, BufferedImage> spritesheetColorMasks = new HashMap<>();
                             for (Path spritesheet : spritesheets) {
                                 String filename = spritesheet.getFileName().toString();
                                 if (filename.toLowerCase().endsWith("-mask.png")) {
                                     spritesheetMasks.put(filename.toLowerCase().replace("-mask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
+                                                                                                                                    // eh
+                                } else if (filename.toLowerCase().endsWith("-colormask.png")) {
+                                    spritesheetColorMasks.put(filename.toLowerCase().replace("-colormask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
+                                } else if (filename.toLowerCase().endsWith("-colourmask.png")) {
+                                    spritesheetColorMasks.put(filename.toLowerCase().replace("-colourmask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
                                 } else if (filename.toLowerCase().endsWith(".png")) {
+                                    //info("    > " + spritesheet);
                                     spritesheetImages.put(filename.toLowerCase().replace(".png", ""), ImageIO.read(new File(spritesheet.toUri())));
                                 }
                             }
                             newVariant.addImages(spritesheetImages);
                             newVariant.addMasks(spritesheetMasks);
+                            newVariant.addColorMasks(spritesheetColorMasks);
 
                             newSprite.addVariant(newVariant.name, newVariant);
 
@@ -308,13 +368,11 @@ class MainPanel extends JPanel {
     }
 
 
-
-
     private String path() {
         return installDirBox.getText() + File.separator + graphicsPath;
     }
 
-    private HashMap<String, BufferedImage> generateImages(Variant variant) {
+    private HashMap<String, BufferedImage> generateImagesForVariant(Variant variant) {
         HashMap<String, BufferedImage> images = new HashMap<>();
 
         for (String key : variant.spritesheetImages.keySet()) {
@@ -322,7 +380,7 @@ class MainPanel extends JPanel {
                 if (key.equalsIgnoreCase(THUMBNAIL_NAME)) {
                     continue;
                 }
-                images.put(key, generateImage(variant, key));
+                images.put(key, generateImageForVariant2(variant, key));
             } catch (Exception ex) {
                 error("Failed to generate image", ex);
             }
@@ -331,13 +389,26 @@ class MainPanel extends JPanel {
         return images;
     }
 
-    private BufferedImage generateImage(Variant variant, String key) throws IOException {
+    private HashMap<Color, Float[]> newAdjustments() {
+        info("New adjustments");
+        adjustments = new HashMap<>();
+        // Add null 'Color' for spritesheets with no colorMask
+        adjustments.put(
+                null,
+                new Float[]{(float) Math.random(), (float) Math.random() * 0.36f - 0.12f, (float) Math.random() * 0.36f - 0.12f}
+        );
+        return adjustments;
+    }
+
+    /*
+    private BufferedImage generateImageForVariant(Variant variant, String key) throws IOException {
         BufferedImage newImage = ImageIO.read(new File(path() + File.separator + key + extension));
         if (freshStart.isSelected()) {
             newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(key));
         }
         BufferedImage replacement = variant.spritesheetImages.get(key);
         BufferedImage mask = variant.spritesheetMasks.get(key);
+        BufferedImage colorMask = variant.spritesheetColorMasks.get(key);
 
         Color transparent = new Color(0,0,0,0);
 
@@ -362,7 +433,129 @@ class MainPanel extends JPanel {
                 }
             }
         }
+
+
+        //newImage = screwWithColors(newImage);
+        if (shuffleColorsBox.isSelected()) {
+            newImage = shuffleColors(newImage, colorMask);
+        }
+
         return newImage;
+    }
+
+    // TODO: Maybe call this in the original loop to avoid looping through everything twice
+    //          I should also be able to reuse colours in colorMasks this way
+    private BufferedImage shuffleColors(BufferedImage img, BufferedImage colorMask) {
+        BufferedImage newImage = copyImage(img);
+        HashMap<Color, Float[]> adjustments = new HashMap<>();
+        int height = img.getHeight(), width=img.getWidth();
+        if (null == colorMask) {
+            adjustments.put(
+                    null,
+                    new Float[] {(float)Math.random(), (float)Math.random()*0.36f-0.12f, (float)Math.random()*0.36f-0.12f}
+            );
+        } else {
+            width = colorMask.getWidth();
+            height = colorMask.getHeight();
+        }
+
+        int transparent = new Color(0,0,0,0).getRGB();
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                Color maskPixel = (null == colorMask) ? null : new Color(colorMask.getRGB(x, y), true);
+                Color pixel = new Color(img.getRGB(x, y),true);
+                if (pixel.getRGB() != transparent && (null == maskPixel || maskPixel.getRGB() != transparent)) {
+                    if (null == adjustments.get(maskPixel)) {
+                        adjustments.put(maskPixel,
+                                new Float[] {(float)Math.random(), (float)Math.random()*0.72f-0.36f, (float)Math.random()*0.5f-0.25f});
+                    }
+                    newImage.setRGB(x, y, adjustPixelColor(pixel.getRGB(), adjustments.get(maskPixel)));
+                }
+            }
+        }
+
+        return newImage;
+    }
+    */
+
+
+
+
+    private BufferedImage generateImageForVariant2(Variant variant, String key) throws IOException {
+        info("Generate image: " + variant.name + "/" + key);
+        info("Exists? " + Files.exists(Paths.get(path() + File.separator + key + extension)));
+        BufferedImage newImage = ImageIO.read(new File(path() + File.separator + key + extension));
+        if (freshStart.isSelected()) {
+            newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(key));
+        }
+        BufferedImage replacement = variant.spritesheetImages.get(key);
+        BufferedImage mask = variant.spritesheetMasks.get(key);
+        BufferedImage colorMask = variant.spritesheetColorMasks.get(key);
+
+        Color transparent = new Color(0,0,0,0);
+
+        // If there's no mask, delete everything
+        if (null == mask) {
+            newImage = replacement;
+        }
+        if (null != mask || shuffleColorsBox.isSelected()) {
+            for (int y = 0; y < replacement.getHeight(); y++) {
+                for (int x = 0; x < replacement.getWidth(); x++) {
+                    Color replacementColor = new Color(replacement.getRGB(x, y), true);
+                    int replacementAlpha = replacementColor.getAlpha();
+                    // Replace the pixel if it's not totally transparent
+                    if (replacementAlpha != 0) {
+                        newImage.setRGB(x, y, replacement.getRGB(x, y));
+                        if (shuffleColorsBox.isSelected()) {
+                            newImage.setRGB(x, y, shuffleRGB(x, y, replacement, colorMask));
+                        }
+                    }
+                    // If it was totally transparent, check if this is something that should be left alone
+                    // Delete areas where the mask colour is non-black
+                    else if (null != mask && new Color(mask.getRGB(x, y)).getBlue() != 0) {
+                        newImage.setRGB(x, y, transparent.getRGB());
+                    }
+                }
+            }
+        }
+
+        //newImage = screwWithColors(newImage);
+
+        return newImage;
+    }
+
+    private int shuffleRGB(int x, int y, BufferedImage img, BufferedImage colorMask) {
+
+        int transparent = new Color(0,0,0,0).getRGB();
+
+        Color maskPixel = (null == colorMask) ? null : new Color(colorMask.getRGB(x, y), true);
+        Color pixel = new Color(img.getRGB(x, y),true);
+        if (pixel.getRGB() != transparent && (null == maskPixel || maskPixel.getRGB() != transparent)) {
+            return adjustPixelColor(pixel.getRGB(), adjustments.get(maskPixel));
+        }
+        return img.getRGB(x, y);
+    }
+
+
+
+
+
+
+
+    private int adjustPixelColor(int rgb, Float[] adjustment) {
+        Color pixel = new Color(rgb, true);
+        float[] hsb = Color.RGBtoHSB(pixel.getRed(), pixel.getGreen(), pixel.getBlue(), null);
+        for (int i = 0; i < hsb.length; i++) {
+            hsb[i] += adjustment[i];
+        }
+        Color tempPixel = new Color(Color.HSBtoRGB(hsb[0], floatClamp(hsb[1]), floatClamp(hsb[2])));
+        Color newPixel = new Color(tempPixel.getRed(), tempPixel.getGreen(), tempPixel.getBlue(), pixel.getAlpha());
+        return newPixel.getRGB();
+    }
+
+    private float floatClamp(float f) {
+        return Math.min(1, Math.max(0, f));
     }
 
     private Path[] listFiles(Path path) {
@@ -395,9 +588,11 @@ class MainPanel extends JPanel {
                 installDirBox.setBackground(new Color(1.0f, 1.0f, 1.0f));
             }
 
-            HashMap<String, BufferedImage> images = generateImages(
+            HashMap<String, BufferedImage> images = generateImagesForVariant(
                     sprites.get(spriteList.getSelectedValue())
                             .variants.get(variantList.getSelectedValue()));
+
+            int writeCount = 0;
             for (String key : images.keySet()) {
                 try {
                     if (key.equalsIgnoreCase(THUMBNAIL_NAME)) {
@@ -405,12 +600,16 @@ class MainPanel extends JPanel {
                         continue;
                     }
                     ImageIO.write(images.get(key), "png", new File(path() + File.separator + key + extension));
+                    writeCount++;
                 } catch (Exception ex) {
                     error("Failed to write a file. If `Fresh start` is unchecked, does the file exist in your game's graphics directory?", ex);
                 }
             }
-
-            info("That save probably worked!");
+            if (writeCount > 0) {
+                info("That save probably worked! Modified " + writeCount + " files");
+            } else {
+                info("That didn't seem to make any changes...");
+            }
         }
         catch (Exception ex) {
             error("Save failed :(", ex);

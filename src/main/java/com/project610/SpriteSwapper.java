@@ -1,7 +1,9 @@
 package com.project610;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.io.IOException;
 
 public class SpriteSwapper {
     public static void main(String[] args) {
@@ -19,6 +21,11 @@ public class SpriteSwapper {
         jf.setContentPane(mainPanel);
         jf.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         //jf.setResizable(false);
+        try {
+            jf.setIconImage(ImageIO.read(SpriteSwapper.class.getClassLoader().getResource("appIcon.png")));
+        } catch (Exception ex) {
+            mainPanel.error("Failed to set app icon", ex);
+        }
         jf.setVisible(true);
     }
 }

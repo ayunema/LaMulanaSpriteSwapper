@@ -7,6 +7,7 @@ public class Variant {
     public String name;
     public HashMap<String, BufferedImage> spritesheetImages;
     public HashMap<String, BufferedImage> spritesheetMasks;
+    public HashMap<String, BufferedImage> spritesheetColorMasks;
 
     public Variant setName (String s) {
         this.name = s;
@@ -20,6 +21,11 @@ public class Variant {
 
     public Variant addMasks(HashMap<String, BufferedImage> spritesheetMasks) {
         this.spritesheetMasks = spritesheetMasks;
+        return this;
+    }
+
+    public Variant addColorMasks(HashMap<String, BufferedImage> spritesheetColorMasks) {
+        this.spritesheetColorMasks = spritesheetColorMasks;
         return this;
     }
 }
