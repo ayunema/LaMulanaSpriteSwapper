@@ -17,10 +17,7 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Set;
+import java.util.*;
 
 class MainPanel extends JPanel {
 
@@ -55,7 +52,7 @@ class MainPanel extends JPanel {
 
     private int LOG_LEVEL = 6; // 3 err, 4 warn, 6 info, 7 debug
 
-    private HashMap<String,Sprite> sprites = new HashMap<>();
+    private TreeMap<String,Sprite> sprites = new TreeMap<>();
     HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
 
     private JFrame parent;
@@ -225,7 +222,7 @@ class MainPanel extends JPanel {
         previewPane.add(prefSize(shuffleColorsBox, 120, 22));
 
         chaosShuffleBox = new JCheckBox("Chaos shuffle", false);
-        chaosShuffleBox.setToolTipText("Will NOT try to keep consistency between spritesheets in a variant)");
+        chaosShuffleBox.setToolTipText("Will NOT try to keep consistency between spritesheets in a variant)\nAlso, try to ensure at least kind-of significant shuffling");
         previewPane.add(prefSize(chaosShuffleBox, 120, 22));
 
 
@@ -363,6 +360,7 @@ class MainPanel extends JPanel {
                     error("Sprite messed up somehow", ex);
                 }
             }
+
 
             for (String key : sprites.keySet()) {
                 spriteList.add(key);
@@ -565,6 +563,7 @@ class MainPanel extends JPanel {
     private int shuffleRGB(int x, int y, BufferedImage img, BufferedImage colorMask, int mods) {
 
         int transparent = new Color(0,0,0,0).getRGB();
+        int black = new Color(0,0,0).getRGB();
 
         Color pixel = new Color(img.getRGB(x, y),true);
         Color maskPixel = (null == colorMask) ? null : new Color(colorMask.getRGB(x, y), true);
@@ -595,19 +594,28 @@ class MainPanel extends JPanel {
                 break;
         }
 
+        // +0.2 ~ +0.8 hue, to avoid too-similar-to-original
+        if (chaosShuffleBox.isSelected() && mods != SHUFFLE_HUE_IGNORE) {
+            h = (float)Math.random() * 0.6f + 0.2f;
+        }
+
         if (null == adjustments.get(maskPixel)) {
             adjustments.put(maskPixel,
                     new Float[] {h, s, b});
         }
 
-        if (pixel.getRGB() != transparent && (null == maskPixel || maskPixel.getRGB() != transparent)) {
-            try {
-                return adjustPixelColor(pixel.getRGB(), adjustments.get(maskPixel));
-            } catch (Exception ex) {
-                error("Something broke shuffling RGB at (" + x + "," + y + ")\n" +
-                        "        pixel="+pixel +"\n"+
-                        "    maxkPixel=" +maskPixel+"\n"+
-                        "  adjustments="+adjustments.get(maskPixel), ex);
+
+        // Preserve black pixels for some sanity
+        if (img.getRGB(x,y) != black) {
+            if (pixel.getRGB() != transparent && (null == maskPixel || maskPixel.getRGB() != transparent)) {
+                try {
+                    return adjustPixelColor(pixel.getRGB(), adjustments.get(maskPixel));
+                } catch (Exception ex) {
+                    error("Something broke shuffling RGB at (" + x + "," + y + ")\n" +
+                            "        pixel="+pixel +"\n"+
+                            "    maxkPixel=" +maskPixel+"\n"+
+                            "  adjustments="+adjustments.get(maskPixel), ex);
+                }
             }
         }
         return img.getRGB(x, y);

@@ -21,8 +21,8 @@ public class Utils {
             LinkedHashMap<Path, Boolean> fileTree = getStructure(Files.walk(getFolderPath(source)).toArray(x -> new Path[x]));
             for (Path path : fileTree.keySet()) {
                 if (!fileTree.get(path)) {
-                    if (!Files.exists(Paths.get(dest+path))) {
-                        Path result = Files.copy(path, Paths.get(dest + path));
+                    if (!Files.exists(Paths.get(dest+File.separator+path))) {
+                        Path result = Files.copy(path, Paths.get(dest + File.separator + path));
                     }
                 } else {
                     Path result = Files.createDirectories(Paths.get(dest + File.separator + path.toString()));

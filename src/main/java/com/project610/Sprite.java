@@ -1,12 +1,12 @@
 package com.project610;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.TreeMap;
 
 public class Sprite {
     public String label;
     public ArrayList<String> files;
-    public HashMap<String, Variant> variants = new HashMap<>();
+    public TreeMap<String, Variant> variants = new TreeMap<>();
 
     public Sprite setLabel(String s) {
         this.label = s;
