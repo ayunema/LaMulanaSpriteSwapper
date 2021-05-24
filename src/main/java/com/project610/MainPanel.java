@@ -46,6 +46,7 @@ class MainPanel extends JPanel {
     private Path spritesPath;
     private String extension = ".png";
     final private String THUMBNAIL_NAME = "thumbnail";
+    public Random rand = new Random();
 
     private boolean debug = false;
     private boolean inIDE = true;
@@ -53,7 +54,7 @@ class MainPanel extends JPanel {
     private int LOG_LEVEL = 6; // 3 err, 4 warn, 6 info, 7 debug
 
     private TreeMap<String,Sprite> sprites = new TreeMap<>();
-    HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
+    private HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
 
     private JFrame parent;
 
@@ -222,7 +223,7 @@ class MainPanel extends JPanel {
         previewPane.add(prefSize(shuffleColorsBox, 120, 22));
 
         chaosShuffleBox = new JCheckBox("Chaos shuffle", false);
-        chaosShuffleBox.setToolTipText("Will NOT try to keep consistency between spritesheets in a variant)\nAlso, try to ensure at least kind-of significant shuffling");
+        chaosShuffleBox.setToolTipText("Will NOT try to keep consistency between spritesheets in a variant. Also, try to ensure at least kind-of significant shuffling");
         previewPane.add(prefSize(chaosShuffleBox, 120, 22));
 
 
@@ -256,25 +257,6 @@ class MainPanel extends JPanel {
         console.append(":)");
     }
 
-    // This was a test. It can probably be retired now.
-//    private BufferedImage screwWithColors(BufferedImage img) {
-//        BufferedImage newImage = copyImage(img);
-//        float adjustment = (float)Math.random();
-//
-//        for (int y = 0; y < newImage.getHeight(); y++) {
-//            for (int x = 0; x < newImage.getWidth(); x++) {
-//                Color pixel = new Color(newImage.getRGB(x,y), true);
-//                float[] hsb = Color.RGBtoHSB(pixel.getRed(), pixel.getGreen(), pixel.getBlue(), null);
-//                hsb[0] = (hsb[0] + adjustment);
-//                Color tempPixel = new Color(Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]));
-//                Color newPixel = new Color(tempPixel.getRed(), tempPixel.getGreen(), tempPixel.getBlue(), pixel.getAlpha());
-//                newImage.setRGB(x, y, newPixel.getRGB());
-//            }
-//        }
-//
-//        return newImage;
-//    }
-
     private void loadSprites() {
 
         try {
@@ -295,7 +277,6 @@ class MainPanel extends JPanel {
                 Path exportPath = Utils.exportResources("sprites", ".");
                 if (null != exportPath) {
                     spritesPath = Paths.get(spritesDirName).normalize().toAbsolutePath();
-                    System.out.println(spritesPath);
                 }
             } catch (Exception ex) {
                 error("Failed to write base sprites to disk", ex);
@@ -394,6 +375,7 @@ class MainPanel extends JPanel {
         HashMap<String, BufferedImage> images = new HashMap<>();
 
         for (String key : variant.spritesheetImages.keySet()) {
+
             try {
                 if (key.equalsIgnoreCase(THUMBNAIL_NAME)) {
                     continue;
@@ -413,92 +395,10 @@ class MainPanel extends JPanel {
         // Add null 'Color' for spritesheets with no colorMask
         adjustments.put(
                 null,
-                new Float[]{(float) Math.random(), (float) Math.random() * 0.36f - 0.12f, (float) Math.random() * 0.36f - 0.12f}
+                new Float[]{rand.nextFloat(), rand.nextFloat() * 0.36f - 0.20f, rand.nextFloat() * 0.36f - 0.12f}
         );
         return adjustments;
     }
-
-    /*
-    private BufferedImage generateImageForVariant(Variant variant, String key) throws IOException {
-        BufferedImage newImage = ImageIO.read(new File(path() + File.separator + key + extension));
-        if (freshStart.isSelected()) {
-            newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(key));
-        }
-        BufferedImage replacement = variant.spritesheetImages.get(key);
-        BufferedImage mask = variant.spritesheetMasks.get(key);
-        BufferedImage colorMask = variant.spritesheetColorMasks.get(key);
-
-        Color transparent = new Color(0,0,0,0);
-
-        // If there's no mask, delete everything
-        if (null == mask) {
-            newImage = replacement;
-        }
-        else {
-            for (int y = 0; y < replacement.getHeight(); y++) {
-                for (int x = 0; x < replacement.getWidth(); x++) {
-                    Color replacementColor = new Color(replacement.getRGB(x, y), true);
-                    int replacementAlpha = replacementColor.getAlpha();
-                    // Replace the pixel if it's not totally transparent
-                    if (replacementAlpha != 0) {
-                        newImage.setRGB(x, y, replacement.getRGB(x, y));
-                    }
-                    // If it was totally transparent, check if this is something that should be left alone
-                    // Delete areas where the mask colour is non-black
-                    else if (new Color(mask.getRGB(x, y)).getBlue() != 0) {
-                        newImage.setRGB(x, y, transparent.getRGB());
-                    }
-                }
-            }
-        }
-
-
-        //newImage = screwWithColors(newImage);
-        if (shuffleColorsBox.isSelected()) {
-            newImage = shuffleColors(newImage, colorMask);
-        }
-
-        return newImage;
-    }
-
-    // TODO: Maybe call this in the original loop to avoid looping through everything twice
-    //          I should also be able to reuse colours in colorMasks this way
-    private BufferedImage shuffleColors(BufferedImage img, BufferedImage colorMask) {
-        BufferedImage newImage = copyImage(img);
-        HashMap<Color, Float[]> adjustments = new HashMap<>();
-        int height = img.getHeight(), width=img.getWidth();
-        if (null == colorMask) {
-            adjustments.put(
-                    null,
-                    new Float[] {(float)Math.random(), (float)Math.random()*0.36f-0.12f, (float)Math.random()*0.36f-0.12f}
-            );
-        } else {
-            width = colorMask.getWidth();
-            height = colorMask.getHeight();
-        }
-
-        int transparent = new Color(0,0,0,0).getRGB();
-
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                Color maskPixel = (null == colorMask) ? null : new Color(colorMask.getRGB(x, y), true);
-                Color pixel = new Color(img.getRGB(x, y),true);
-                if (pixel.getRGB() != transparent && (null == maskPixel || maskPixel.getRGB() != transparent)) {
-                    if (null == adjustments.get(maskPixel)) {
-                        adjustments.put(maskPixel,
-                                new Float[] {(float)Math.random(), (float)Math.random()*0.72f-0.36f, (float)Math.random()*0.5f-0.25f});
-                    }
-                    newImage.setRGB(x, y, adjustPixelColor(pixel.getRGB(), adjustments.get(maskPixel)));
-                }
-            }
-        }
-
-        return newImage;
-    }
-    */
-
-
-
 
     private BufferedImage generateImageForVariant2(Variant variant, String key) throws IOException {
         info("Generating image: " + path() + File.separator + key + extension);
@@ -569,34 +469,34 @@ class MainPanel extends JPanel {
         Color maskPixel = (null == colorMask) ? null : new Color(colorMask.getRGB(x, y), true);
 
         // Add new randomized adjustment if this maskPixel is a colour not yet seen for this variant
-        float h = (float)Math.random();
-        float s = (float)Math.random()*0.72f-0.36f;
-        float b = (float)Math.random()*0.5f-0.25f;
+        float h = rand.nextFloat();
+        float s = rand.nextFloat()*0.72f-0.36f;
+        float b = rand.nextFloat()*0.5f-0.25f;
 
         switch (mods) {
             case SHUFFLE_SATURATION_IGNORE:
                 s = 0;
                 break;
             case SHUFFLE_SATURATION_ONLY_DOWN:
-                s = (float)Math.random()*0.36f-0.36f;
+                s = rand.nextFloat()*0.36f-0.36f;
                 break;
             case SHUFFLE_SATURATION_ONLY_UP:
-                s =(float)Math.random()*0.36f;
+                s =rand.nextFloat()*0.36f;
                 break;
             case SHUFFLE_BRIGHTNESS_IGNORE:
                 b = 0;
                 break;
             case SHUFFLE_BRIGHTNESS_ONLY_DOWN:
-                b = (float)Math.random()*0.25f-0.25f;
+                b = rand.nextFloat()*0.25f-0.25f;
                 break;
             case SHUFFLE_BRIGHTNESS_ONLY_UP:
-                b =(float)Math.random()*0.25f;
+                b =rand.nextFloat()*0.25f;
                 break;
         }
 
         // +0.2 ~ +0.8 hue, to avoid too-similar-to-original
         if (chaosShuffleBox.isSelected() && mods != SHUFFLE_HUE_IGNORE) {
-            h = (float)Math.random() * 0.6f + 0.2f;
+            h = rand.nextFloat() * 0.6f + 0.2f;
         }
 
         if (null == adjustments.get(maskPixel)) {
@@ -613,19 +513,13 @@ class MainPanel extends JPanel {
                 } catch (Exception ex) {
                     error("Something broke shuffling RGB at (" + x + "," + y + ")\n" +
                             "        pixel="+pixel +"\n"+
-                            "    maxkPixel=" +maskPixel+"\n"+
+                            "    maskPixel=" +maskPixel+"\n"+
                             "  adjustments="+adjustments.get(maskPixel), ex);
                 }
             }
         }
         return img.getRGB(x, y);
     }
-
-
-
-
-
-
 
     private int adjustPixelColor(int rgb, Float[] adjustment) {
         Color pixel = new Color(rgb, true);
@@ -680,7 +574,6 @@ class MainPanel extends JPanel {
             for (String key : images.keySet()) {
                 try {
                     if (key.equalsIgnoreCase(THUMBNAIL_NAME)) {
-                        System.out.println("Skipping thumbnail");
                         continue;
                     }
                     ImageIO.write(images.get(key), "png", new File(path() + File.separator + key + extension));

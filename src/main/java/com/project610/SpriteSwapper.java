@@ -14,7 +14,7 @@ public class SpriteSwapper {
             ex.printStackTrace();
         }
         JFrame jf = new JFrame("La-Mulana Sprite Swapper");
-        jf.setSize(100, 100);
+        //jf.setSize(100, 100);
         jf.setMinimumSize(new Dimension(710, 591));
         MainPanel mainPanel = new MainPanel(args, jf);
         mainPanel.setBackground(new Color(230, 230,230));
