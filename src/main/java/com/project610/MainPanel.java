@@ -32,9 +32,9 @@ class MainPanel extends JPanel {
     private final int SHUFFLE_BRIGHTNESS_ONLY_UP = 302;
 
     private JTextField installDirBox;
-    private JList2<String> spriteList;
-    private JList2<String> variantList;
-    private JCheckBox freshStart;
+    JList2<String> spriteList;
+    JList2<String> variantList;
+    private JCheckBox freshStartBox;
     private JCheckBox shuffleColorsBox;
     private JCheckBox chaosShuffleBox;
     private JLabel imageView;
@@ -44,19 +44,22 @@ class MainPanel extends JPanel {
     private String graphicsPath = "data" + File.separator + "graphics" + File.separator + "00";
     private String spritesDirName = "sprites";
     private Path spritesPath;
-    private String extension = ".png";
-    final private String THUMBNAIL_NAME = "thumbnail";
+    String extension = ".png";
+    final String THUMBNAIL_NAME = "thumbnail";
     public Random rand = new Random();
+
+    ImageGenerator imageGenerator = new ImageGenerator(this);
 
     private boolean debug = false;
     private boolean inIDE = true;
 
     private int LOG_LEVEL = 6; // 3 err, 4 warn, 6 info, 7 debug
 
-    private TreeMap<String,Sprite> sprites = new TreeMap<>();
-    private HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
+    public TreeMap<String,Sprite> sprites = new TreeMap<>();
+    public HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
 
     private JFrame parent;
+    private HashSet<Component> blockables;
 
     MainPanel(String[] args, JFrame parent) {
         this.parent = parent;
@@ -81,6 +84,7 @@ class MainPanel extends JPanel {
 
     private void init() {
         removeAll();
+        blockables = new HashSet<>();
 
         setLayout(new BorderLayout(0, 0));
 
@@ -94,6 +98,7 @@ class MainPanel extends JPanel {
         topPane.add(prefSize(new JLabel("La-Mulana install directory"), 155, 20));
 
         installDirBox = new JTextField(40);
+        blockables.add(installDirBox);
         topPane.add(prefSize(installDirBox, 400, 20));
 
 
@@ -113,6 +118,7 @@ class MainPanel extends JPanel {
 
         spriteListPane.add(prefSize(new JLabel("   Sprite"), 170, 20));
         spriteList = new JList2<>();
+        blockables.add(spriteList);
         spriteList.setBorder(BorderFactory.createLineBorder(Color.lightGray));
         spriteList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         spriteList.setVisibleRowCount(12);
@@ -133,6 +139,7 @@ class MainPanel extends JPanel {
 
         variantListPane.add(prefSize(new JLabel("   Variant"), 170, 20));
         variantList = new JList2<>();
+        blockables.add(variantList);
         variantList.setBorder(BorderFactory.createLineBorder(Color.lightGray));
         variantList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         variantListPane.add(prefSize(variantList, 159, 266));
@@ -206,23 +213,28 @@ class MainPanel extends JPanel {
         midPane.add(previewPane, BorderLayout.LINE_END);
         midPane.add(prefSize(previewPane, 350, 300), BorderLayout.LINE_END);
 
-        freshStart = new JCheckBox("Fresh start", true);
-        freshStart.setToolTipText("Avoid overwriting previous changes, when possible");
-        previewPane.add(prefSize(freshStart, 90, 20));
+        freshStartBox = new JCheckBox("Fresh start", true);
+        blockables.add(freshStartBox);
+        freshStartBox.setToolTipText("Avoid overwriting previous changes, when possible");
+        previewPane.add(prefSize(freshStartBox, 90, 20));
 
         JButton applyButton = new JButton("Apply");
+        blockables.add(applyButton);
         previewPane.add(prefSize(applyButton, 70, 22));
         applyButton.addActionListener(e -> save());
 
         JButton refreshButton = new JButton("Refresh sprite files");
+        blockables.add(refreshButton);
         refreshButton.addActionListener(e -> loadSprites()); // TODO: Make this work in-IDE again (Probably after changing packaged sprites to a download)
         previewPane.add(prefSize(refreshButton, 150, 22));
 
         shuffleColorsBox = new JCheckBox("Shuffle colours", false);
+        blockables.add(shuffleColorsBox);
         shuffleColorsBox.setToolTipText("Will randomize colours if the variant has a colour mask (eg: `00prof-COLORMASK.png`)");
         previewPane.add(prefSize(shuffleColorsBox, 120, 22));
 
         chaosShuffleBox = new JCheckBox("Chaos shuffle", false);
+        blockables.add(chaosShuffleBox);
         chaosShuffleBox.setToolTipText("Will NOT try to keep consistency between spritesheets in a variant. Also, try to ensure at least kind-of significant shuffling");
         previewPane.add(prefSize(chaosShuffleBox, 120, 22));
 
@@ -367,11 +379,12 @@ class MainPanel extends JPanel {
     }
 
 
-    private String path() {
+    String path() {
         return installDirBox.getText() + File.separator + graphicsPath;
     }
 
-    private HashMap<String, BufferedImage> generateImagesForVariant(Variant variant) {
+    public HashMap<String, BufferedImage> generateImagesForVariant(Variant variant) {
+
         HashMap<String, BufferedImage> images = new HashMap<>();
 
         for (String key : variant.spritesheetImages.keySet()) {
@@ -389,7 +402,7 @@ class MainPanel extends JPanel {
         return images;
     }
 
-    private HashMap<Color, Float[]> newAdjustments() {
+    public HashMap<Color, Float[]> newAdjustments() {
         info("New adjustments");
         adjustments = new HashMap<>();
         // Add null 'Color' for spritesheets with no colorMask
@@ -403,7 +416,7 @@ class MainPanel extends JPanel {
     private BufferedImage generateImageForVariant2(Variant variant, String key) throws IOException {
         info("Generating image: " + path() + File.separator + key + extension);
         BufferedImage newImage = null;
-        if (freshStart.isSelected()) {
+        if (freshStartBox.isSelected()) {
             newImage = copyImage(sprites.get(spriteList.getSelectedValue()).variants.get("DEFAULT").spritesheetImages.get(key));
         } else {
             try {
@@ -471,7 +484,7 @@ class MainPanel extends JPanel {
         // Add new randomized adjustment if this maskPixel is a colour not yet seen for this variant
         float h = rand.nextFloat();
         float s = rand.nextFloat()*0.72f-0.36f;
-        float b = rand.nextFloat()*0.5f-0.25f;
+        float b = rand.nextFloat()*0.25f-0.25f; // Used to be +/- 0.25, now just -0.25 ~ 0
 
         switch (mods) {
             case SHUFFLE_SATURATION_IGNORE:
@@ -486,7 +499,7 @@ class MainPanel extends JPanel {
             case SHUFFLE_BRIGHTNESS_IGNORE:
                 b = 0;
                 break;
-            case SHUFFLE_BRIGHTNESS_ONLY_DOWN:
+            case SHUFFLE_BRIGHTNESS_ONLY_DOWN: // Kinda pointless, since I'm gonna not increase brightness for ugliness-prevention. Though, I guess I could multiply instead of adding brightness, and that would solve a lot of my issues.
                 b = rand.nextFloat()*0.25f-0.25f;
                 break;
             case SHUFFLE_BRIGHTNESS_ONLY_UP:
@@ -558,6 +571,7 @@ class MainPanel extends JPanel {
     private void save() {
         try {
             info("Trying to save changes");
+
             if (installDirBox.getText().trim().length() == 0 || !Files.exists(Paths.get(path()))) {
                 installDirBox.setBackground(new Color(1.0f, 0.7f, 0.7f));
                 warn("Failed to locate graphics directory at: " + path());
@@ -566,30 +580,25 @@ class MainPanel extends JPanel {
                 installDirBox.setBackground(new Color(1.0f, 1.0f, 1.0f));
             }
 
-            HashMap<String, BufferedImage> images = generateImagesForVariant(
-                    sprites.get(spriteList.getSelectedValue())
-                            .variants.get(variantList.getSelectedValue()));
+            // Process/save the images in another thread, so the UI doesn't hang
+            new Thread(imageGenerator).start();
 
-            int writeCount = 0;
-            for (String key : images.keySet()) {
-                try {
-                    if (key.equalsIgnoreCase(THUMBNAIL_NAME)) {
-                        continue;
-                    }
-                    ImageIO.write(images.get(key), "png", new File(path() + File.separator + key + extension));
-                    writeCount++;
-                } catch (Exception ex) {
-                    error("Failed to write a file. If `Fresh start` is unchecked, does the file exist in your game's graphics directory?", ex);
-                }
-            }
-            if (writeCount > 0) {
-                info("That save probably worked! Modified " + writeCount + " files");
-            } else {
-                info("That didn't seem to make any changes...");
-            }
+
         }
         catch (Exception ex) {
             error("Save failed :(", ex);
+        }
+    }
+
+    public void blockUI() {
+        for (Component c : blockables) {
+            c.setEnabled(false);
+        }
+    }
+
+    public void unblockUI() {
+        for (Component c : blockables) {
+            c.setEnabled(true);
         }
     }
 
