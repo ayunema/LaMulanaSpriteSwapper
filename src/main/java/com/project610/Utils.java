@@ -1,5 +1,6 @@
 package com.project610;
 
+import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -160,5 +161,11 @@ public class Utils {
         }
 
         return laMulanaBaseDir;
+    }
+
+    // Lazy UI stuff, will eventually obsolete this crap
+    public static Component prefSize(Component component, int w, int h) {
+        component.setPreferredSize(new Dimension(w, h));
+        return component;
     }
 }

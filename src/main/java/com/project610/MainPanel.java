@@ -1,6 +1,7 @@
 package com.project610;
 
 import com.project610.structs.JList2;
+import com.project610.ui.DownloadPanel;
 import org.jetbrains.annotations.Nullable;
 
 import javax.imageio.ImageIO;
@@ -10,16 +11,18 @@ import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.*;
+import java.net.URL;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.file.*;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
-class MainPanel extends JPanel {
+import static com.project610.Utils.prefSize;
+
+public class MainPanel extends JPanel {
 
     // This isn't great, but it works for now
     private final int SHUFFLE_NORMAL = 0;
@@ -40,12 +43,14 @@ class MainPanel extends JPanel {
     private JLabel imageView;
     private JTextArea console;
     private JScrollPane consoleScroll;
+    private JDialog downloadDialog;
 
     private String graphicsPath = "data" + File.separator + "graphics" + File.separator + "00";
     private String spritesDirName = "sprites";
     private Path spritesPath;
     String extension = ".png";
     final String THUMBNAIL_NAME = "thumbnail";
+    private float fontSize = 11f;
     public Random rand = new Random();
 
     ImageGenerator imageGenerator = new ImageGenerator(this);
@@ -53,7 +58,7 @@ class MainPanel extends JPanel {
     private boolean debug = false;
     private boolean inIDE = true;
 
-    private int LOG_LEVEL = 6; // 3 err, 4 warn, 6 info, 7 debug
+    private int LOG_LEVEL = 6; // 3 err, 4 warn, *6 info*, 7 debug
 
     public TreeMap<String,Sprite> sprites = new TreeMap<>();
     public HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
@@ -79,7 +84,6 @@ class MainPanel extends JPanel {
             installDirBox.setText(Utils.guessInstallLocation(this));
         }
 
-        loadSprites();
     }
 
     private void init() {
@@ -97,10 +101,22 @@ class MainPanel extends JPanel {
 
         topPane.add(prefSize(new JLabel("La-Mulana install directory"), 155, 20));
 
-        installDirBox = new JTextField(40);
+        installDirBox = new JTextField();
         blockables.add(installDirBox);
-        topPane.add(prefSize(installDirBox, 400, 20));
+        topPane.add(prefSize(installDirBox, 350, 20));
 
+        /////////// This is really kinda bad, and I should probably not do it over just fixing the root of the Manjaro giant-text issue
+        topPane.add(new JLabel("Text size:"));
+
+        JButton textSizeDownButton = new JButton("-");
+        textSizeDownButton.setMargin(new Insets(0,0,0,0));
+        textSizeDownButton.addActionListener(e -> changeFont(this, --fontSize));
+        topPane.add(prefSize(textSizeDownButton, 20, 20));
+
+        JButton textSizeUpButton = new JButton("+");
+        textSizeUpButton.setMargin(new Insets(0,0,0,0));
+        textSizeUpButton.addActionListener(e -> changeFont(this, ++fontSize));
+        topPane.add(prefSize(textSizeUpButton, 20, 20));
 
 
 
@@ -124,7 +140,7 @@ class MainPanel extends JPanel {
         spriteList.setVisibleRowCount(12);
         spriteList.setPrototypeCellValue("Lick my balls");
         spriteListPane.add(prefSize(spriteList, 159, 266));
-        
+
         spriteList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) return;
 
@@ -161,7 +177,7 @@ class MainPanel extends JPanel {
                     thumbnail.getRGB(0,0);
                 }
                 // If there's no thumbnail, fall back on whatever first spritesheet we can find
-                // TODO: Maybe prioritize something, in some way, somehow
+                // TODO: Prioritize a non-thumbnail image, depending on context
                 catch (Exception ex) {
                     try {
                         if (currentSprite.label.equalsIgnoreCase("lemeza")) {
@@ -266,35 +282,126 @@ class MainPanel extends JPanel {
         if (debug) consoleScroll.setBackground(new Color(1f,0f,1f));
         bottomPane.add(prefSize(consoleScroll, 680, 180));
 
+        changeFont(this, fontSize);
+
+        downloadDialog = new JDialog(parent, "Download sprites?");
+        downloadDialog.setSize(400,95);
+        downloadDialog.setLocation(parent.getLocation().x + 100, parent.getLocation().y + 200);
+        downloadDialog.setModal(true);
+
+        DownloadPanel downloadPanel = new DownloadPanel(this);
+        downloadDialog.add(downloadPanel);
+
+
         console.append(":)");
     }
 
-    private void loadSprites() {
+    private void changeFont(Container c, float size) {
+        for (Component c2 : c.getComponents()) {
+            c2.setFont(c2.getFont().deriveFont(size));
+            if (c2 instanceof Container) {
+                changeFont((Container)c2, size);
+            }
+        }
+    }
+
+    // TODO: Thread-ify this bad boy, to stop UI from freezing
+    public void downloadSprites() {
+        final String ERASABLE_ZIP_PATH = "LaMulanaSpriteSwapper-main/src/main/resources/";
+        final String tempDir = "tmp";
+        final String zipPath = tempDir + File.separator + "lmss-main.zip";
+
+        ReadableByteChannel rbc = null;
+        FileOutputStream zipFileOutputStream = null;
+        FileInputStream zipFileInputStream = null;
+        ZipInputStream zipInputStream = null;
+
+        try {
+            info("Downloading sprites from github: https://github.com/Virus610/LaMulanaSpriteSwapper");
+            URL url = new URL("https://github.com/Virus610/LaMulanaSpriteSwapper/archive/refs/heads/main.zip");
+            rbc = Channels.newChannel(url.openStream());
+
+            // Download LMSS repo zip to temp folder
+            Files.createDirectories(Paths.get("tmp"));
+            File zipFile = new File(zipPath);
+            zipFileOutputStream = new FileOutputStream(zipFile);
+            zipFileOutputStream.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+
+            // Read zip into memory, copy stuff out to sprites folder (Don't overwrite stuff, in case user has local edits)
+            zipFileInputStream = new FileInputStream(zipPath);
+            zipInputStream = new ZipInputStream(zipFileInputStream);
+            ZipEntry entry;
+            while ((entry = zipInputStream.getNextEntry()) != null) {
+                if (entry.getName().toLowerCase().contains("resources/sprites")) {
+                    String outputPath = entry.getName().replace(ERASABLE_ZIP_PATH, "");
+                    if (entry.isDirectory()) {
+                        Files.createDirectories(Paths.get(outputPath));
+                    } else {
+                        try {
+                            FileSystem fileSystem = FileSystems.newFileSystem(Paths.get(zipPath), null);
+                            Files.copy(fileSystem.getPath(entry.getName()), Paths.get(outputPath));
+                        }
+                        catch (FileAlreadyExistsException ex) {
+                            // IDGAF right now
+                        }
+                        catch (Exception ex) {
+                            error("Failed to extract sprite file from zip", ex);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            error("Failed to download sprites from github", ex);
+        } finally {
+            closeThing(rbc);
+            closeThing(zipFileOutputStream);
+            closeThing(zipFileInputStream);
+            closeThing(zipInputStream);
+
+            try {
+                Files.deleteIfExists(Paths.get(zipPath));
+            } catch (Exception ex) {
+                error("Failed to clean up downloaded zip containing sprites.", ex);
+            }
+        }
+    }
+
+    private void closeThing(Closeable s) {
+        try {
+            if (null != s) s.close();
+        } catch (Exception ex) {
+            // Nyeh!
+        }
+    }
+
+    // Load sprites from disk (`sprites` folder in same dir as app)
+    // If sprites folder doesn't exist, offer to download it for the user
+    //  * Don't do any internet stuff without asking
+    public void loadSprites() {
 
         try {
             // Ignore this. Proof of concept for re-scaling the window if I want to eventually allow minimizing the console
 //            Dimension dim = parent.getMinimumSize();
 //            dim.setSize(dim.width*1.1, dim.height*1.3);
 //            parent.setMinimumSize(dim);
+
+            if (!Files.exists(Paths.get(spritesDirName))) {
+                warn("No sprites folder located. Prompting to download from main repository.");
+                downloadDialog.setVisible(true);
+                downloadDialog.toFront();
+                return;
+            }
+
             info("Loading sprites from disk...");
+
+            // If something is already selected, store the selected values for re-selection if/after reloading
             String selectedSprite = spriteList.getSelectedValue();
             String selectedVariant = variantList.getSelectedValue();
             sprites.clear();
             spriteList.clear();
             variantList.clear();
 
-            // First try to copy sprites folder to disk, so peeps can use their own private sprites
-            // (This should only be needed if running from a jar, as in-IDE, the resources should be properly copied to the target dir
-            try {
-                Path exportPath = Utils.exportResources("sprites", ".");
-                if (null != exportPath) {
-                    spritesPath = Paths.get(spritesDirName).normalize().toAbsolutePath();
-                }
-            } catch (Exception ex) {
-                error("Failed to write base sprites to disk", ex);
-            }
-
-            if (null == spritesPath) spritesPath = Utils.getFolderPath(spritesDirName);
+            spritesPath = Paths.get("sprites");
             Path[] spriteFiles = listFiles(spritesPath);
 
             // Get all sprite options
@@ -317,7 +424,6 @@ class MainPanel extends JPanel {
                         String variantName = variant.getFileName().toString();
                         Variant newVariant = new Variant().setName(variantName);
 
-                        //info("Adding: " + newSprite.label + "/" + newVariant.name);
                         // Get images of variation
                         try {
                             Path[] spritesheets = listFiles(variant);
@@ -328,13 +434,11 @@ class MainPanel extends JPanel {
                                 String filename = spritesheet.getFileName().toString();
                                 if (filename.toLowerCase().endsWith("-mask.png")) {
                                     spritesheetMasks.put(filename.toLowerCase().replace("-mask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
-                                                                                                                                    // eh
                                 } else if (filename.toLowerCase().endsWith("-colormask.png")) {
                                     spritesheetColorMasks.put(filename.toLowerCase().replace("-colormask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
                                 } else if (filename.toLowerCase().endsWith("-colourmask.png")) {
                                     spritesheetColorMasks.put(filename.toLowerCase().replace("-colourmask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
                                 } else if (filename.toLowerCase().endsWith(".png")) {
-                                    //info("    > " + spritesheet);
                                     spritesheetImages.put(filename.toLowerCase().replace(".png", ""), ImageIO.read(new File(spritesheet.toUri())));
                                 }
                             }
@@ -354,7 +458,6 @@ class MainPanel extends JPanel {
                 }
             }
 
-
             for (String key : sprites.keySet()) {
                 spriteList.add(key);
             }
@@ -373,23 +476,16 @@ class MainPanel extends JPanel {
         }
     }
 
-    private Component prefSize(Component component, int w, int h) {
-        component.setPreferredSize(new Dimension(w, h));
-        return component;
-    }
-
-
     String path() {
         return installDirBox.getText() + File.separator + graphicsPath;
     }
 
     public HashMap<String, BufferedImage> generateImagesForVariant(Variant variant) {
-
         HashMap<String, BufferedImage> images = new HashMap<>();
 
         for (String key : variant.spritesheetImages.keySet()) {
-
             try {
+                // Skip thumbnails when generating images - Those don't get copied to LM graphics folder
                 if (key.equalsIgnoreCase(THUMBNAIL_NAME)) {
                     continue;
                 }
@@ -398,17 +494,18 @@ class MainPanel extends JPanel {
                 error("Failed to generate image", ex);
             }
         }
-
         return images;
     }
 
+    // Reset adjustments for colour shuffling (New variant, or chaos + new spritesheet)
     public HashMap<Color, Float[]> newAdjustments() {
         info("New adjustments");
         adjustments = new HashMap<>();
-        // Add null 'Color' for spritesheets with no colorMask
+
+        // Add null 'Color' for areas with no colorMask
         adjustments.put(
                 null,
-                new Float[]{rand.nextFloat(), rand.nextFloat() * 0.36f - 0.20f, rand.nextFloat() * 0.36f - 0.12f}
+                new Float[]{rand.nextFloat(), rand.nextFloat() * 0.36f - 0.24f, rand.nextFloat() * 0.25f - 0.25f}
         );
         return adjustments;
     }
@@ -464,8 +561,6 @@ class MainPanel extends JPanel {
             }
         }
 
-        //newImage = screwWithColors(newImage);
-
         return newImage;
     }
 
@@ -483,7 +578,7 @@ class MainPanel extends JPanel {
 
         // Add new randomized adjustment if this maskPixel is a colour not yet seen for this variant
         float h = rand.nextFloat();
-        float s = rand.nextFloat()*0.72f-0.36f;
+        float s = rand.nextFloat()*0.36f-0.24f;
         float b = rand.nextFloat()*0.25f-0.25f; // Used to be +/- 0.25, now just -0.25 ~ 0
 
         switch (mods) {
@@ -516,7 +611,6 @@ class MainPanel extends JPanel {
             adjustments.put(maskPixel,
                     new Float[] {h, s, b});
         }
-
 
         // Preserve black pixels for some sanity
         if (img.getRGB(x,y) != black) {
@@ -582,8 +676,6 @@ class MainPanel extends JPanel {
 
             // Process/save the images in another thread, so the UI doesn't hang
             new Thread(imageGenerator).start();
-
-
         }
         catch (Exception ex) {
             error("Save failed :(", ex);
@@ -639,7 +731,6 @@ class MainPanel extends JPanel {
 //            scroll.revalidate();
 //            System.out.println(scroll.getValue() + " / " + scroll.getMaximum());
             console.setCaretPosition(console.getDocument().getLength());
-
         }
     }
 }
