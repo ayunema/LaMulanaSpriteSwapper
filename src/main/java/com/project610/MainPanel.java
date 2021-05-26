@@ -307,7 +307,7 @@ public class MainPanel extends JPanel {
 
     // TODO: Thread-ify this bad boy, to stop UI from freezing
     public void downloadSprites() {
-        final String ERASABLE_ZIP_PATH = "LaMulanaSpriteSwapper-main/src/main/resources/";
+        final String ERASABLE_ZIP_PATH = "LaMulanaSpriteSwapper-main/";
         final String tempDir = "tmp";
         final String zipPath = tempDir + File.separator + "lmss-main.zip";
 
@@ -332,7 +332,7 @@ public class MainPanel extends JPanel {
             zipInputStream = new ZipInputStream(zipFileInputStream);
             ZipEntry entry;
             while ((entry = zipInputStream.getNextEntry()) != null) {
-                if (entry.getName().toLowerCase().contains("resources/sprites")) {
+                if (entry.getName().toLowerCase().contains("/sprites/")) {
                     String outputPath = entry.getName().replace(ERASABLE_ZIP_PATH, "");
                     if (entry.isDirectory()) {
                         Files.createDirectories(Paths.get(outputPath));
