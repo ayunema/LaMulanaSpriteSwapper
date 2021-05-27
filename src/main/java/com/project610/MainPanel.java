@@ -444,7 +444,7 @@ public class MainPanel extends JPanel {
         // Add null 'Color' for areas with no colorMask
         adjustments.put(
                 null,
-                new Float[]{rand.nextFloat(), rand.nextFloat() * 0.36f - 0.24f, rand.nextFloat() * 0.25f - 0.25f}
+                new Float[]{rand.nextFloat(), rand.nextFloat() * 0.36f - 0.18f, 1 + rand.nextFloat() * 0.50f - 0.25f}
         );
         return adjustments;
     }
@@ -477,8 +477,8 @@ public class MainPanel extends JPanel {
             }
             int shuffleMods = 0;
             if (Arrays.asList("01effect", "fog00", "fog01").contains(key.toLowerCase())) {
-                info("BRIGHTNESS ONLY DOWN for: " + key);
-                shuffleMods = SHUFFLE_BRIGHTNESS_ONLY_DOWN;
+                /*info("BRIGHTNESS ONLY DOWN for: " + key);
+                shuffleMods = SHUFFLE_BRIGHTNESS_ONLY_DOWN;*/
             }
             for (int y = 0; y < replacement.getHeight(); y++) {
                 for (int x = 0; x < replacement.getWidth(); x++) {
@@ -517,9 +517,11 @@ public class MainPanel extends JPanel {
 
         // Add new randomized adjustment if this maskPixel is a colour not yet seen for this variant
         float h = rand.nextFloat();
-        float s = rand.nextFloat()*0.36f-0.24f;
-        float b = rand.nextFloat()*0.25f-0.25f; // Used to be +/- 0.25, now just -0.25 ~ 0
+        float s = rand.nextFloat()*0.36f-0.18f;
+        float b = 1 + rand.nextFloat()*0.50f-0.25f;
 
+        // heck the mods for now
+        /*
         switch (mods) {
             case SHUFFLE_SATURATION_IGNORE:
                 s = 0;
@@ -539,7 +541,7 @@ public class MainPanel extends JPanel {
             case SHUFFLE_BRIGHTNESS_ONLY_UP:
                 b =rand.nextFloat()*0.25f;
                 break;
-        }
+        }*/
 
         // +0.2 ~ +0.8 hue, to avoid too-similar-to-original
         if (chaosShuffleBox.isSelected() && mods != SHUFFLE_HUE_IGNORE) {
@@ -570,9 +572,9 @@ public class MainPanel extends JPanel {
     private int adjustPixelColor(int rgb, Float[] adjustment) {
         Color pixel = new Color(rgb, true);
         float[] hsb = Color.RGBtoHSB(pixel.getRed(), pixel.getGreen(), pixel.getBlue(), null);
-        for (int i = 0; i < hsb.length; i++) {
-            hsb[i] += adjustment[i];
-        }
+        hsb[0] += adjustment[0];
+        hsb[1] += adjustment[1];
+        hsb[2] *= adjustment[2];
         Color tempPixel = new Color(Color.HSBtoRGB(hsb[0], floatClamp(hsb[1]), floatClamp(hsb[2])));
         Color newPixel = new Color(tempPixel.getRed(), tempPixel.getGreen(), tempPixel.getBlue(), pixel.getAlpha());
         return newPixel.getRGB();
@@ -611,6 +613,11 @@ public class MainPanel extends JPanel {
                 return;
             } else {
                 installDirBox.setBackground(new Color(1.0f, 1.0f, 1.0f));
+            }
+
+            if (null == spriteList.getSelectedValue() || null == variantList.getSelectedValue()) {
+                warn("Can't save without selecting a Sprite + Variant combo");
+                return;
             }
 
             // Process/save the images in another thread, so the UI doesn't hang
