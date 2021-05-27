@@ -1,6 +1,7 @@
 package com.project610;
 
 import java.awt.*;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -168,4 +169,14 @@ public class Utils {
         component.setPreferredSize(new Dimension(w, h));
         return component;
     }
+
+    public static void closeThing(Closeable s) {
+        try {
+            if (null != s) s.close();
+        } catch (Exception ex) {
+            // Nyeh!
+        }
+    }
+
+
 }

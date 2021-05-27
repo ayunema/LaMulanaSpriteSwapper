@@ -21,7 +21,6 @@ public class DownloadPanel extends JPanel {
         downloadYesButton.setMargin(new Insets(2,4,2,4));
         downloadYesButton.addActionListener(e -> {
             mainPanel.downloadSprites();
-            mainPanel.loadSprites();
             SwingUtilities.windowForComponent(this).setVisible(false);
         });
         add(downloadYesButton, BorderLayout.CENTER);
@@ -29,7 +28,7 @@ public class DownloadPanel extends JPanel {
         JButton downloadNoButton = new JButton("❌ No");
         downloadNoButton.setMargin(new Insets(2,4,2,4));
         downloadNoButton.addActionListener(e -> {
-            mainPanel.info("You will need a `sprites` folder in the same directory as the Sprite Swapper jar file to use this app.\n  You can download it automatically by clicking 'Refresh sprite files' (top right),\n  or pull it from the repo manually, here:\n    https://github.com/Virus610/LaMulanaSpriteSwapper ");
+            mainPanel.info("You need a `sprites` folder in the same directory as the Sprite Swapper jar file to use this app.\n  You can download it automatically by clicking 'Refresh sprite files' (top right),\n  or pull it from the repo manually, here:\n    https://github.com/Virus610/LaMulanaSpriteSwapper ");
             SwingUtilities.windowForComponent(this).setVisible(false);
         });
         add(downloadNoButton, BorderLayout.LINE_END);

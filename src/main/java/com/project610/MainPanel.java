@@ -1,5 +1,7 @@
 package com.project610;
 
+import com.project610.runnables.ImageGenerator;
+import com.project610.runnables.SpriteDownloader;
 import com.project610.structs.JList2;
 import com.project610.ui.DownloadPanel;
 import org.jetbrains.annotations.Nullable;
@@ -35,8 +37,8 @@ public class MainPanel extends JPanel {
     private final int SHUFFLE_BRIGHTNESS_ONLY_UP = 302;
 
     private JTextField installDirBox;
-    JList2<String> spriteList;
-    JList2<String> variantList;
+    public JList2<String> spriteList;
+    public JList2<String> variantList;
     private JCheckBox freshStartBox;
     private JCheckBox shuffleColorsBox;
     private JCheckBox chaosShuffleBox;
@@ -48,12 +50,13 @@ public class MainPanel extends JPanel {
     private String graphicsPath = "data" + File.separator + "graphics" + File.separator + "00";
     private String spritesDirName = "sprites";
     private Path spritesPath;
-    String extension = ".png";
-    final String THUMBNAIL_NAME = "thumbnail";
+    public String extension = ".png";
+    public final String THUMBNAIL_NAME = "thumbnail";
     private float fontSize = 11f;
     public Random rand = new Random();
 
     ImageGenerator imageGenerator = new ImageGenerator(this);
+    SpriteDownloader spriteDownloader = new SpriteDownloader(this);
 
     private boolean debug = false;
     private boolean inIDE = true;
@@ -307,71 +310,7 @@ public class MainPanel extends JPanel {
 
     // TODO: Thread-ify this bad boy, to stop UI from freezing
     public void downloadSprites() {
-        final String ERASABLE_ZIP_PATH = "LaMulanaSpriteSwapper-main/";
-        final String tempDir = "tmp";
-        final String zipPath = tempDir + File.separator + "lmss-main.zip";
-
-        ReadableByteChannel rbc = null;
-        FileOutputStream zipFileOutputStream = null;
-        FileInputStream zipFileInputStream = null;
-        ZipInputStream zipInputStream = null;
-
-        try {
-            info("Downloading sprites from github: https://github.com/Virus610/LaMulanaSpriteSwapper");
-            URL url = new URL("https://github.com/Virus610/LaMulanaSpriteSwapper/archive/refs/heads/main.zip");
-            rbc = Channels.newChannel(url.openStream());
-
-            // Download LMSS repo zip to temp folder
-            Files.createDirectories(Paths.get("tmp"));
-            File zipFile = new File(zipPath);
-            zipFileOutputStream = new FileOutputStream(zipFile);
-            zipFileOutputStream.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
-
-            // Read zip into memory, copy stuff out to sprites folder (Don't overwrite stuff, in case user has local edits)
-            zipFileInputStream = new FileInputStream(zipPath);
-            zipInputStream = new ZipInputStream(zipFileInputStream);
-            ZipEntry entry;
-            while ((entry = zipInputStream.getNextEntry()) != null) {
-                if (entry.getName().toLowerCase().contains("/sprites/")) {
-                    String outputPath = entry.getName().replace(ERASABLE_ZIP_PATH, "");
-                    if (entry.isDirectory()) {
-                        Files.createDirectories(Paths.get(outputPath));
-                    } else {
-                        try {
-                            FileSystem fileSystem = FileSystems.newFileSystem(Paths.get(zipPath), null);
-                            Files.copy(fileSystem.getPath(entry.getName()), Paths.get(outputPath));
-                        }
-                        catch (FileAlreadyExistsException ex) {
-                            // IDGAF right now
-                        }
-                        catch (Exception ex) {
-                            error("Failed to extract sprite file from zip", ex);
-                        }
-                    }
-                }
-            }
-        } catch (Exception ex) {
-            error("Failed to download sprites from github", ex);
-        } finally {
-            closeThing(rbc);
-            closeThing(zipFileOutputStream);
-            closeThing(zipFileInputStream);
-            closeThing(zipInputStream);
-
-            try {
-                Files.deleteIfExists(Paths.get(zipPath));
-            } catch (Exception ex) {
-                error("Failed to clean up downloaded zip containing sprites.", ex);
-            }
-        }
-    }
-
-    private void closeThing(Closeable s) {
-        try {
-            if (null != s) s.close();
-        } catch (Exception ex) {
-            // Nyeh!
-        }
+        new Thread(spriteDownloader).start();
     }
 
     // Load sprites from disk (`sprites` folder in same dir as app)
@@ -476,7 +415,7 @@ public class MainPanel extends JPanel {
         }
     }
 
-    String path() {
+    public String path() {
         return installDirBox.getText() + File.separator + graphicsPath;
     }
 

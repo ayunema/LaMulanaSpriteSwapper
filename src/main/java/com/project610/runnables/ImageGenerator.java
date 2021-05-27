@@ -1,4 +1,6 @@
-package com.project610;
+package com.project610.runnables;
+
+import com.project610.MainPanel;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
