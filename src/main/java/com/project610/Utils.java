@@ -112,6 +112,8 @@ public class Utils {
                 , "$HOME/.steam/steam/steamapps/common/La-Mulana"
                 , "$HOME/.local/share/Steam/steamapps/common/La-Mulana"
                 , "~/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/common/La-Mulana"
+
+                , "/home/gaming/.PlayOnLinux/wineprefix/GOG_LaMulana/drive_c/GOG Games/La-Mulana/"
         )) {
             try {
                 if (new File(filename).exists()) {
@@ -132,6 +134,7 @@ public class Utils {
                         , "/usr/local/share/applications/gog_com-La_Mulana_1.desktop"
                         , System.getProperty("user.home") + "/.local/share/applications/gog_com-La_Mulana_1.desktop"
                         , System.getProperty("user.home") + "/Desktop/gog_com-La_Mulana_1.desktop"
+
                         /* other valid paths for the .desktop file to be located? */)) {
 
                     File menu_entry_file = new File(menu_entry_file_path);

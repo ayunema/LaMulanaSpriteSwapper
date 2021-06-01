@@ -2,29 +2,30 @@ package com.project610;
 
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
+import java.util.TreeMap;
 
 public class Variant {
     public String name;
-    public HashMap<String, BufferedImage> spritesheetImages;
-    public HashMap<String, BufferedImage> spritesheetMasks;
-    public HashMap<String, BufferedImage> spritesheetColorMasks;
+    public TreeMap<String, BufferedImage> spritesheetImages;
+    public TreeMap<String, BufferedImage> spritesheetMasks;
+    public TreeMap<String, BufferedImage> spritesheetColorMasks;
 
     public Variant setName (String s) {
         this.name = s;
         return this;
     }
 
-    public Variant addImages(HashMap<String, BufferedImage> spritesheetImages) {
+    public Variant addImages(TreeMap<String, BufferedImage> spritesheetImages) {
         this.spritesheetImages = spritesheetImages;
         return this;
     }
 
-    public Variant addMasks(HashMap<String, BufferedImage> spritesheetMasks) {
+    public Variant addMasks(TreeMap<String, BufferedImage> spritesheetMasks) {
         this.spritesheetMasks = spritesheetMasks;
         return this;
     }
 
-    public Variant addColorMasks(HashMap<String, BufferedImage> spritesheetColorMasks) {
+    public Variant addColorMasks(TreeMap<String, BufferedImage> spritesheetColorMasks) {
         this.spritesheetColorMasks = spritesheetColorMasks;
         return this;
     }

@@ -8,30 +8,42 @@ import java.awt.*;
 
 public class DownloadPanel extends JPanel {
     MainPanel mainPanel;
+    JLabel label = new JLabel();
+    public boolean folderExists = true;
+
     public DownloadPanel(MainPanel mainPanel) {
         this.mainPanel = mainPanel;
-        setLayout(new BorderLayout());
-        JLabel label = new JLabel();
+        setLayout(new BoxLayout(this, BoxLayout.LINE_AXIS));
         label.setBorder(new EmptyBorder(2, 6, 2, 2));
-        label.setText("<html>      No sprites folder detected.<br/> Download sprites from the app repository?</html>");
-        add(label, BorderLayout.LINE_START);
+        setLabel("");
+        add(label);
 
-        //                 How much you wanna bet these emojis don't work on Linux or something?
-        JButton downloadYesButton = new JButton("✅ Yes");
-        downloadYesButton.setMargin(new Insets(2,4,2,4));
+        JButton downloadYesButton = new JButton("Yes", mainPanel.icons.get("check"));
+        downloadYesButton.setMargin(new Insets(20,25,20,25));
+        downloadYesButton.setMinimumSize(new Dimension (800, 50));
         downloadYesButton.addActionListener(e -> {
+            mainPanel.cancelLoading = true;
             mainPanel.downloadSprites();
             SwingUtilities.windowForComponent(this).setVisible(false);
         });
-        add(downloadYesButton, BorderLayout.CENTER);
+        add(downloadYesButton);
 
-        JButton downloadNoButton = new JButton("❌ No");
-        downloadNoButton.setMargin(new Insets(2,4,2,4));
+        JButton downloadNoButton = new JButton("No", mainPanel.icons.get("x"));
+        downloadNoButton.setMargin(new Insets(20,10,20,10));
         downloadNoButton.addActionListener(e -> {
-            mainPanel.info("You need a `sprites` folder in the same directory as the Sprite Swapper jar file to use this app.\n  You can download it automatically by clicking 'Refresh sprite files' (top right),\n  or pull it from the repo manually, here:\n    https://github.com/Virus610/LaMulanaSpriteSwapper ");
+            if (!folderExists) {
+                mainPanel.info("You need a `sprites` folder in the same directory as the Sprite Swapper jar file to use this app.\n  You can download it automatically by clicking 'Refresh sprite files' (top right),\n  or pull it from the repo manually, here:\n    https://github.com/Virus610/LaMulanaSpriteSwapper ");
+            } else {
+                mainPanel.info("If you decide you want me to check for downloads later... Good luck with that.\n          There isn't any button for that yet!");
+            }
             SwingUtilities.windowForComponent(this).setVisible(false);
         });
-        add(downloadNoButton, BorderLayout.LINE_END);
+        add(downloadNoButton);
+
         setVisible(true);
+    }
+
+    public void setLabel(String s) {
+        label.setText("<html>"+s+"</html>");
     }
 }

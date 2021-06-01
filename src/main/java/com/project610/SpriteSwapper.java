@@ -28,7 +28,7 @@ public class SpriteSwapper {
 
         //jf.setResizable(false);
         try {
-            jf.setIconImage(ImageIO.read(SpriteSwapper.class.getClassLoader().getResource("appIcon.png")));
+            jf.setIconImage(ImageIO.read(SpriteSwapper.class.getClassLoader().getResource("icons/appIcon.png")));
         } catch (Exception ex) {
             mainPanel.error("Failed to set app icon", ex);
         }

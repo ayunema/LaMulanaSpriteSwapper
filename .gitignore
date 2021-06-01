@@ -3,6 +3,7 @@
 zip.lnk
 *.aseprite
 *.psd
+lmss-settings.json
 
 # IDE Stuff
 .idea
