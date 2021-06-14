@@ -32,7 +32,7 @@ public class DownloadPanel extends JPanel {
         downloadNoButton.setMargin(new Insets(20,10,20,10));
         downloadNoButton.addActionListener(e -> {
             if (!folderExists) {
-                mainPanel.info("You need a `sprites` folder in the same directory as the Sprite Swapper jar file to use this app.\n  You can download it automatically by clicking 'Refresh sprite files' (top right),\n  or pull it from the repo manually, here:\n    https://github.com/Virus610/LaMulanaSpriteSwapper ");
+                mainPanel.info("You need a `sprites` folder in the same directory as the Sprite Swapper jar file to use this app.\n  You can download it automatically by clicking 'Reload sprites' (top of Sprites panel),\n  or pull it from the repo manually, here:\n    https://github.com/Virus610/LaMulanaSpriteSwapper ");
             } else {
                 mainPanel.info("If you decide you want me to check for downloads later... Good luck with that.\n          There isn't any button for that yet!");
             }
@@ -44,6 +44,6 @@ public class DownloadPanel extends JPanel {
     }
 
     public void setLabel(String s) {
-        label.setText("<html>"+s+"</html>");
+        label.setText("<html>" + s + "</html>");
     }
 }

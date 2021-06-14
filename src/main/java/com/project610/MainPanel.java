@@ -58,6 +58,7 @@ public class MainPanel extends JPanel {
 
     private String graphicsPath = "data" + File.separator + "graphics" + File.separator + "00";
     private String spritesDirName = "sprites";
+    private String presetsDirName = "presets";
     private Path spritesPath;
     public String extension = ".png";
     public final String THUMBNAIL_NAME = "thumbnail";
@@ -728,6 +729,7 @@ public class MainPanel extends JPanel {
 
     // TODO: Thread-ify this bad boy, to stop UI from freezing
     public void downloadSprites() {
+        newVersion = false; // Probably don't need to prompt for new-version stuff if we just downloaded stuff
         new Thread(spriteDownloader).start();
     }
 
@@ -741,7 +743,10 @@ public class MainPanel extends JPanel {
     // If sprites folder doesn't exist, offer to download it for the user
     //  * Don't do any internet stuff without asking
     public void loadSprites() {
-        if (alreadyLoading) return;
+        if (alreadyLoading) {
+            info("Already loading sprites, not gonna try loading again");
+            return;
+        }
 
         blockUI();
         try {
@@ -753,9 +758,14 @@ public class MainPanel extends JPanel {
             if (!skipDownloadPrompt) {
                 if (!Files.exists(Paths.get(spritesDirName))) {
                     downloadPanel.folderExists = false;
+                    cancelLoading = true;
                     warn("No sprites folder located. Prompting to download from main repository.");
-                    downloadPopup("      No sprites folder detected.<br/> Download sprites from the app repository?");
-                    return;
+                    downloadPopup("      No sprites folder detected.<br/> Download sprites/presets from the app repository?");
+                } else if (!Files.exists(Paths.get(presetsDirName))) {
+                    downloadPanel.folderExists = false;
+                    cancelLoading = true;
+                    warn("No presets folder located. Prompting to download from main repository.");
+                    downloadPopup("      No presets folder detected.<br/> Download sprites/presets from the app repository?");
                 } else if (newVersion) {
                     newVersion = false;
                     alreadyLoading = true;
@@ -769,6 +779,7 @@ public class MainPanel extends JPanel {
 
             if (cancelLoading) {
                 cancelLoading = false;
+                unblockUI();
                 return;
             }
 
