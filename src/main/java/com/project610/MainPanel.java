@@ -6,6 +6,7 @@ import com.project610.structs.JList2;
 import com.project610.ui.ChangePanel;
 import com.project610.ui.DownloadPanel;
 import org.jetbrains.annotations.Nullable;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import javax.imageio.ImageIO;
@@ -16,6 +17,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
@@ -75,11 +77,14 @@ public class MainPanel extends JPanel {
     public boolean skipDownloadPrompt = false;
     public boolean alreadyLoading = false;
     public boolean cancelLoading = false;
+    public boolean loadingPresets = false;
 
     private int LOG_LEVEL = 6; // 3 err, 4 warn, *6 info*, 7 debug
 
     public TreeMap<String,Sprite> sprites = new TreeMap<>();
     public HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
+    public TreeMap<String, Preset> presets = new TreeMap<>();
+    public JComboBox<String> presetBox;
 
     private JFrame parent;
     private HashSet<Component> blockables;
@@ -99,7 +104,11 @@ public class MainPanel extends JPanel {
         // TODO: Load base directory from stored settings
         // TODO: Store settings
         if (installDirBox.getText().trim().isEmpty()) {
-            installDirBox.setText(Utils.guessInstallLocation(this));
+            try {
+                installDirBox.setText(settings.getString("installLocation"));
+            } catch (Exception ex) {
+                installDirBox.setText(Utils.guessInstallLocation(this));
+            }
         }
 
     }
@@ -120,25 +129,34 @@ public class MainPanel extends JPanel {
                 settings = new JSONObject(new String(Files.readAllBytes(settingsPath)));
             } else {
                 settings = new JSONObject();
-                Files.write(settingsPath, settings.toString().getBytes());
+                writeSettings();
+
             }
         } catch (Exception ex) {
             error("Failed to read settings from disk", ex);
         }
 
-        // Read properties as defined in the shipped app
+        // Read settings from memory, compare to settings on disk
         try {
-            properties = Files.readAllLines(Paths.get(getClass().getClassLoader().getResource(".properties").toURI()));
-            for (String line : properties) {
-                if (line.startsWith("version=")) appVersion = line.substring(line.indexOf("=")+1);
-                if (!settings.has("version") || !settings.getString("version").equalsIgnoreCase(appVersion)) {
-                    settings.put("version", appVersion);
-                    Files.write(settingsPath, settings.toString().getBytes());
-                    newVersion = true;
+            InputStream is = getClass().getClassLoader().getResourceAsStream(".properties");
+
+            //properties = Files.readAllLines(Paths.get(getClass().getClassLoader().getResource(".properties").toURI()));
+            BufferedReader br = new BufferedReader (new InputStreamReader(is, StandardCharsets.UTF_8));
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.startsWith("version=")) {
+                    appVersion = line.substring(line.indexOf("=") + 1);
+                    if (!settings.has("version") || !settings.getString("version").equalsIgnoreCase(appVersion)) {
+                        settings.put("version", appVersion);
+                        writeSettings();
+                        newVersion = true;
+                    }
                 }
             }
         } catch (Exception ex) {
-            error("Failed to read app properties", ex);
+            // Not using console because DNE yet
+            System.err.println("Failed to read app properties");
+            ex.printStackTrace();
         }
 
         icons = new HashMap<>();
@@ -173,12 +191,20 @@ public class MainPanel extends JPanel {
 
         JButton textSizeDownButton = new JButton("-");
         textSizeDownButton.setMargin(new Insets(0,0,0,0));
-        textSizeDownButton.addActionListener(e -> changeFont(this, --fontSize));
+        textSizeDownButton.addActionListener(e -> {
+            changeFont(this, --fontSize);
+            settings.put("fontSize", fontSize);
+            writeSettings();
+        });
         topPane.add(prefSize(textSizeDownButton, 20, 20));
 
         JButton textSizeUpButton = new JButton("+");
         textSizeUpButton.setMargin(new Insets(0,0,0,0));
-        textSizeUpButton.addActionListener(e -> changeFont(this, ++fontSize));
+        textSizeUpButton.addActionListener(e -> {
+            changeFont(this, ++fontSize);
+            settings.put("fontSize", fontSize);
+            writeSettings();
+        });
         topPane.add(prefSize(textSizeUpButton, 20, 20));
 
 
@@ -400,27 +426,27 @@ public class MainPanel extends JPanel {
 
         previewPane.add(prefSize(changeScroll, 340, 186));
 
-        previewPane.add(Box.createRigidArea(new Dimension(264,20)));
+
+        presetBox = new JComboBox<>();
+        presetBox.setEditable(true);
+        presetBox.addActionListener(e -> {
+            if (null != presetBox.getSelectedItem() && !loadingPresets) {
+                loadPreset(presetBox.getSelectedItem().toString());
+            }
+        });
+
+        previewPane.add(prefSize(presetBox, 160, 22));
+
+        JButton savePresetButton = new JButton("Save preset");
+        savePresetButton.addActionListener(e -> savePreset((String)presetBox.getSelectedItem()));
+        previewPane.add(prefSize(savePresetButton, 90, 22));
+
+        //previewPane.add(Box.createRigidArea(new Dimension(264,20)));
 
         JButton applyButton = new JButton("Apply");
         blockables.add(applyButton);
         previewPane.add(prefSize(applyButton, 70, 22));
         applyButton.addActionListener(e -> save());
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -459,7 +485,13 @@ public class MainPanel extends JPanel {
         if (debug) consoleScroll.setBackground(new Color(1f,0f,1f));
         bottomPane.add(prefSize(consoleScroll, 680, 180));
 
-        changeFont(this, fontSize);
+
+        try {
+            fontSize = settings.getFloat("fontSize");
+            changeFont(this, fontSize);
+        } catch (Exception ex) {
+
+        }
 
         downloadDialog = new JDialog(parent, "Download sprites?");
         downloadDialog.setSize(500,95);
@@ -471,6 +503,137 @@ public class MainPanel extends JPanel {
 
 
         console.append(":)");
+    }
+
+    public void savePreset(String name) {
+        info("Saving preset with name: " + name);
+
+        JSONObject json = new JSONObject();
+        json.put("name", name);
+        String filename = name;
+        filename = filename.replaceAll("[^A-Za-z0-9\\-_]", "_") + ".json";
+
+        JSONArray array = new JSONArray();
+
+
+        ArrayList<PresetSprite> presetSprites = new ArrayList<>();
+        for (ChangePanel change : changesList) {
+
+            JSONObject preset = new JSONObject();
+
+            preset.put("spriteName", change.spriteLabel.getText());
+            preset.put("variantName", change.variantLabel.getText());
+            preset.put("freshStart", change.freshStartBox.isSelected());
+            preset.put("shuffleColors", change.shuffleColorBox.isSelected());
+            preset.put("chaosShuffle", change.chaosShuffleBox.isSelected());
+
+            array.put(preset);
+        }
+
+        json.put("presetSprites", array);
+/*
+        Preset preset = new Preset();
+        preset.name = name;
+        preset.presetSprites = presetSprites;
+
+        presets.put(name, preset);*/
+
+        try {
+            Files.write(Paths.get("./presets/" + filename).normalize(), json.toString().getBytes());
+        } catch (Exception ex) {
+            error("heck", ex);
+        }
+
+        info("JSON: \n" + json.toString());
+
+
+        loadPresets();
+        presetBox.setSelectedItem(name);
+    }
+
+    public void loadPreset(String name) {
+        if (name == null) {
+            warn ("wtf yo");
+            return;
+        }
+
+        if (null == presets.get(name)) {
+            return;
+        }
+
+        clearChanges();
+
+        if (name.equalsIgnoreCase(".EMPTY")) {
+            return;
+        }
+
+        info("Loading preset: '" + name + "'");
+        Preset preset = presets.get(name);
+
+
+        for (PresetSprite sprite : preset.presetSprites) {
+
+
+            String changeLabel = sprite.spriteName + "/" + sprite.variantName;
+
+            // Don't add if already exists
+            for (ChangePanel change : changesList) {
+                String temp = change.spriteLabel.getText() + "/" + change.variantLabel.getText();
+                if (changeLabel.equalsIgnoreCase(temp)) {
+                    continue;
+                }
+            }
+            ChangePanel newChange = new ChangePanel(this, sprite.spriteName, sprite.variantName, sprite.freshStart, sprite.shuffleColors, sprite.chaosShuffle);
+            changesList.add(newChange);
+            addChange(newChange);
+            changesPanel.revalidate();
+        }
+    }
+
+    public void loadPresets() {
+        try {
+            loadingPresets = true;
+
+            presets.clear();
+            presetBox.removeAllItems();
+
+            for (Path path : listFiles(Paths.get("./presets"))) {
+                Preset preset = new Preset();
+                JSONObject json = new JSONObject(new String(Files.readAllBytes(path.normalize())));
+
+                preset.name = json.getString("name");
+                JSONArray array = json.getJSONArray("presetSprites");
+                for (Object obj : array) {
+                    JSONObject temp = new JSONObject(obj.toString());
+                    PresetSprite sprite = new PresetSprite();
+                    sprite.spriteName = temp.getString("spriteName");
+                    sprite.variantName = temp.getString("variantName");
+                    sprite.freshStart = temp.getBoolean("freshStart");
+                    sprite.shuffleColors = temp.getBoolean("shuffleColors");
+                    sprite.chaosShuffle = temp.getBoolean("chaosShuffle");
+                    preset.presetSprites.add(sprite);
+                }
+                presets.put(preset.name, preset);
+            }
+
+            presets.put(".EMPTY", new Preset());
+
+            for (String key : presets.keySet()) {
+                presetBox.addItem(key);
+            }
+        } catch (Exception ex) {
+            error("Screwed up loading presets :(", ex);
+        }
+
+        loadingPresets = false;
+    }
+
+    public void writeSettings() {
+        try {
+            Files.write(settingsPath, settings.toString().getBytes());
+        } catch (Exception ex) {
+            error("Failed to write settings to file", ex);
+        }
     }
 
     public ChangePanel newChange() {
@@ -497,6 +660,7 @@ public class MainPanel extends JPanel {
         } else {
             newChange.setBackground(new Color(0.97f, 0.97f, 0.97f));
         }
+        changeFont(newChange, fontSize);
         changesPanel.add(prefSize(newChange, 280, 24));
     }
 
@@ -527,6 +691,12 @@ public class MainPanel extends JPanel {
         }
     }
 
+    public void clearChanges() {
+        while (changesList.size() > 0) {
+            removeChange(changesList.get(0));
+        }
+    }
+
     public void removeChange(ChangePanel change) {
         change.setVisible(false);
         int pos = changesList.indexOf(change);
@@ -547,6 +717,7 @@ public class MainPanel extends JPanel {
     }
 
     private void changeFont(Container c, float size) {
+
         for (Component c2 : c.getComponents()) {
             c2.setFont(c2.getFont().deriveFont(size));
             if (c2 instanceof Container) {
@@ -692,6 +863,14 @@ public class MainPanel extends JPanel {
         }
 
         unblockUI();
+
+        if (changesList.size() > 0) {
+            info("Reload and reapply");
+            save();
+        }
+
+        loadPresets();
+
     }
 
 
@@ -797,7 +976,7 @@ public class MainPanel extends JPanel {
     }
 
     // Reset adjustments for color shuffling (New variant, or chaos + new spritesheet)
-    public HashMap<Color, Float[]> newAdjustments(boolean chaosShuffle) {
+    public HashMap<Color, Float[]> newAdjustments(boolean chaosShuffle) { // chaosShuffle param is kinda vestigial at this point
         debug("New adjustments");
         adjustments = new HashMap<>();
 
@@ -805,10 +984,9 @@ public class MainPanel extends JPanel {
         float s = rand.nextFloat()*0.36f-0.18f;
         float b = 1 + rand.nextFloat()*0.50f-0.25f;
 
-        // +0.2 ~ +0.8 hue, to avoid too-similar-to-original
-        if (chaosShuffle) {
-            h = rand.nextFloat() * 0.6f + 0.2f;
-        }
+        /*if (chaosShuffle) {
+            h = rand.nextFloat() * 0.8f + 0.1f;
+        }*/
 
         // Add null 'Color' for areas with no colorMask
         adjustments.put(
@@ -906,11 +1084,6 @@ public class MainPanel extends JPanel {
             }
             */
 
-            // +0.2 ~ +0.8 hue, to avoid too-similar-to-original
-            if (chaosShuffle && mods != SHUFFLE_HUE_IGNORE) {
-                h = rand.nextFloat() * 0.6f + 0.2f;
-            }
-
             adjustments.put(maskPixel,
                     new Float[] {h, s, b});
         }
@@ -947,14 +1120,15 @@ public class MainPanel extends JPanel {
     }
 
     private Path[] listFiles(Path path) {
+        Object[] files = new Object[0];
         try {
-            Object[] files = Files.list(path).toArray();
+            files = Files.list(path).toArray();
             return Arrays.copyOf(files, files.length, Path[].class);
         }
         catch (Exception ex) {
             error("Fffff- Failed to list files in: " + path, ex);
         }
-        return null;
+        return Arrays.copyOf(files, files.length, Path[].class);
     }
 
     private BufferedImage copyImage(BufferedImage source){
@@ -995,12 +1169,16 @@ public class MainPanel extends JPanel {
             info("----------\n");
             info("Trying to save changes");
 
+            newAdjustments(chaosShuffleBox.isSelected());
+
             if (installDirBox.getText().trim().length() == 0 || !Files.exists(Paths.get(path()))) {
                 installDirBox.setBackground(new Color(1.0f, 0.7f, 0.7f));
                 warn("Failed to locate graphics directory at: " + path());
                 return;
             } else {
                 installDirBox.setBackground(new Color(1.0f, 1.0f, 1.0f));
+                settings.put("installLocation", installDirBox.getText());
+                writeSettings();
             }
 
             if (changesList.size() == 0) {

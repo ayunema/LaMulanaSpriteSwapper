@@ -38,7 +38,7 @@ public class SpriteDownloader implements Runnable {
         ZipInputStream zipInputStream = null;
 
         try {
-            mainPanel.info("Downloading sprites from github: https://github.com/Virus610/LaMulanaSpriteSwapper");
+            mainPanel.info("Downloading sprites/presets from github: https://github.com/Virus610/LaMulanaSpriteSwapper");
             URL url = new URL("https://github.com/Virus610/LaMulanaSpriteSwapper/archive/refs/heads/main.zip");
             rbc = Channels.newChannel(url.openStream());
 
@@ -54,7 +54,7 @@ public class SpriteDownloader implements Runnable {
             zipInputStream = new ZipInputStream(zipFileInputStream);
             ZipEntry entry;
             while ((entry = zipInputStream.getNextEntry()) != null) {
-                if (entry.getName().toLowerCase().contains("/sprites/")) {
+                if (entry.getName().toLowerCase().contains("/sprites/") || entry.getName().toLowerCase().contains("/presets/")) {
                     String outputPath = entry.getName().replace(ERASABLE_ZIP_PATH, "");
                     if (entry.isDirectory()) {
                         Files.createDirectories(Paths.get(outputPath));
@@ -75,7 +75,7 @@ public class SpriteDownloader implements Runnable {
             }
             mainPanel.info("  ... Extraction complete!");
         } catch (Exception ex) {
-            mainPanel.error("Failed to download sprites from github", ex);
+            mainPanel.error("Failed to download sprites/presets from github", ex);
         } finally {
             closeThing(rbc);
             closeThing(zipFileOutputStream);
@@ -85,7 +85,7 @@ public class SpriteDownloader implements Runnable {
             try {
                 Files.deleteIfExists(Paths.get(zipPath));
             } catch (Exception ex) {
-                mainPanel.error("Failed to clean up downloaded zip containing sprites.", ex);
+                mainPanel.error("Failed to clean up downloaded zip containing sprites/presets.", ex);
             }
         }
 

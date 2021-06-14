@@ -6,7 +6,7 @@
 
     <groupId>com.project610.lamulana.spriteswapper</groupId>
     <artifactId>LaMulanaSpriteSwapper</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>0.6.0b2</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -59,10 +59,27 @@
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
+                <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>
+                                single
+                            </goal>
+                        </goals>
+                    </execution>
+                </executions>
                 <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
                     <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <mainClass>com.project610.SpriteSwapper</mainClass>
+                        </manifest>
                         <manifestFile>${project.build.sourceDirectory}/META-INF/MANIFEST.MF</manifestFile>
                     </archive>
                 </configuration>
