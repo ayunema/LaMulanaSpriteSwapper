@@ -1,0 +1,5 @@
+<div>Sunglasses Overlay<br/>
+No mask on this, so it will just draw glasses over whatever sprite you're using.<br/>
+<i>(Only designed to actually show up properly on Lemeza's face though)</i><br/><br/>
+
+&copy; <a href="https://www.twitter.com/virus610">@Virus610</a></div>

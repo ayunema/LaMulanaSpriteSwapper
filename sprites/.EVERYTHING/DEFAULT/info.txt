@@ -1,0 +1,3 @@
+<div>Vanilla everything.<br/><br/>
+
+&copy; NIGORO</div>
