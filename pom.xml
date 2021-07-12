@@ -6,7 +6,7 @@
 
     <groupId>com.project610.lamulana.spriteswapper</groupId>
     <artifactId>LaMulanaSpriteSwapper</artifactId>
-    <version>0.6.0b2</version>
+    <version>0.6.0</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -75,6 +75,8 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+                    <finalName>${project.build.finalName}</finalName>
+                    <appendAssemblyId>false</appendAssemblyId>
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>

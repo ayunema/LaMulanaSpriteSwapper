@@ -19,26 +19,30 @@ public class ChangePanel extends JPanel {
     public JCheckBox shuffleColorBox;
     public JCheckBox chaosShuffleBox;
 
+    public JButton deleteButton;
+    public JButton upButton;
+    public JButton downButton;
+
     public ChangePanel(MainPanel mainPanel, String spriteName, String variantName, boolean freshStart, boolean shuffleColor, boolean chaosShuffle) {
         this.mainPanel = mainPanel;
 
         setLayout(new BoxLayout(this, BoxLayout.LINE_AXIS));
 
-        JButton deleteButton = new JButton(mainPanel.icons.get("lil-x"));
+        deleteButton = new JButton(mainPanel.icons.get("lil-x"));
         deleteButton.setBorderPainted(false);
         deleteButton.setBorder(new EmptyBorder(7, 7, 7,7));
         deleteButton.setContentAreaFilled(false);
         deleteButton.addActionListener(e -> mainPanel.removeChange(this));
         add(deleteButton);
 
-        JButton upButton = new JButton(mainPanel.icons.get("up"));
+        upButton = new JButton(mainPanel.icons.get("up"));
         upButton.setBorderPainted(false);
         upButton.setBorder(new EmptyBorder(7, 2, 7,2));
         upButton.setContentAreaFilled(false);
         upButton.addActionListener(e -> mainPanel.moveChange(this, -1, upButton));
         add(upButton);
 
-        JButton downButton = new JButton(mainPanel.icons.get("down"));
+        downButton = new JButton(mainPanel.icons.get("down"));
         downButton.setBorderPainted(false);
         downButton.setBorder(new EmptyBorder(7, 2, 7,2));
         downButton.setContentAreaFilled(false);

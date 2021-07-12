@@ -9,6 +9,7 @@ public class Variant {
     public TreeMap<String, BufferedImage> spritesheetImages;
     public TreeMap<String, BufferedImage> spritesheetMasks;
     public TreeMap<String, BufferedImage> spritesheetColorMasks;
+    public String info = "";
 
     public Variant setName (String s) {
         this.name = s;
@@ -27,6 +28,11 @@ public class Variant {
 
     public Variant addColorMasks(TreeMap<String, BufferedImage> spritesheetColorMasks) {
         this.spritesheetColorMasks = spritesheetColorMasks;
+        return this;
+    }
+
+    public Variant setInfo (String s) {
+        this.info = s;
         return this;
     }
 }

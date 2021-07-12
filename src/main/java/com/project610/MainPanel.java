@@ -5,6 +5,7 @@ import com.project610.runnables.SpriteDownloader;
 import com.project610.structs.JList2;
 import com.project610.ui.ChangePanel;
 import com.project610.ui.DownloadPanel;
+import com.project610.ui.VariantInfoPanel;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -13,6 +14,8 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
 import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
@@ -152,6 +155,7 @@ public class MainPanel extends JPanel {
                         writeSettings();
                         newVersion = true;
                     }
+                    parent.setTitle(parent.getTitle() + " v" + appVersion);
                 }
             }
         } catch (Exception ex) {
@@ -252,9 +256,14 @@ public class MainPanel extends JPanel {
         midPane.add(prefSize(variantListPane, 170, 300), BorderLayout.CENTER);
 
         variantListPane.add(new JLabel(" Variant"));
+        JButton variantInfoButton = new JButton ("Info");
+        variantInfoButton.setEnabled(false);
+        variantInfoButton.addActionListener(e -> showVariantInfo(currentVariant()));
 
-        variantListPane.add(Box.createRigidArea(new Dimension(1,25)));
+        variantListPane.add(Box.createRigidArea(new Dimension(45,25)));
         variantListPane.add(Box.createHorizontalGlue());
+
+        variantListPane.add(variantInfoButton);
 
 
 
@@ -300,6 +309,7 @@ public class MainPanel extends JPanel {
                 addButton.setEnabled(false);
             } else {
                 addButton.setEnabled(true);
+                variantInfoButton.setEnabled(!currentVariant().info.trim().isEmpty());
             }
 
             if (!e.getValueIsAdjusting()) return;
@@ -506,6 +516,57 @@ public class MainPanel extends JPanel {
         console.append(":)");
     }
 
+    public void showVariantInfo(Variant variant) {
+        Variant currentVariant = currentVariant(); //                                      v---------- But why -----------v
+        JDialog infoDialog = new JDialog(parent, "Variant info: " + currentSprite().label + " / " + currentVariant.name);
+
+        infoDialog.addKeyListener(new KeyListener() {
+            @Override
+            public void keyTyped(KeyEvent e) {
+                System.out.println(e);
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                System.out.println(e);
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                System.out.println(e);
+            }
+        });
+
+        infoDialog.setSize(500,150);
+        infoDialog.setLocation(parent.getLocation().x + 100, parent.getLocation().y + 200);
+        infoDialog.setModal(true);
+        infoDialog.add(new VariantInfoPanel(infoDialog, currentVariant));
+
+        /*KeyboardFocusManager
+                .getCurrentKeyboardFocusManager()
+                .addKeyEventDispatcher(e -> {
+                    System.out.println(e);
+                    if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                        try {
+                            infoDialog.dispose();
+                            return true;
+                        } catch (Exception ex) {}
+                    }
+                    return false;
+                });*/
+
+        infoDialog.setVisible(true);
+
+    }
+
+    public Sprite currentSprite() {
+        return sprites.get(spriteList.getSelectedValue());
+    }
+
+    public Variant currentVariant() {
+        return currentSprite().variants.get(variantList.getSelectedValue());
+    }
+
     public void savePreset(String name) {
         info("Saving preset with name: " + name);
 
@@ -656,13 +717,14 @@ public class MainPanel extends JPanel {
     }
 
     public void addChange(ChangePanel newChange) {
-        if (changesPanel.getComponents().length % 2 == 0) {
+        /*if (changesPanel.getComponents().length % 2 == 0) {
             newChange.setBackground(new Color(.87f, .87f, 1f));
         } else {
-            newChange.setBackground(new Color(0.97f, 0.97f, 0.97f));
-        }
+            newChange.setBackground(new Color(0.97f, 0.97f, 0.97f)); // #F7F7F7
+        }*/
         changeFont(newChange, fontSize);
         changesPanel.add(prefSize(newChange, 280, 24));
+        revalidateChangeList();
     }
 
     public void moveChange(ChangePanel change, int pos, JButton button) {
@@ -703,12 +765,26 @@ public class MainPanel extends JPanel {
         int pos = changesList.indexOf(change);
         changesList.remove(change);
         changesPanel.remove(change);
-        fixChangeList(pos);
+        //fixChangeList(pos);
+        revalidateChangeList();
         changesPanel.revalidate();
     }
 
     public void fixChangeList(int pos) {
         for (int i = pos; i < changesList.size(); i++) {
+            if (i %2 == 0) {
+                changesList.get(i).setBackground(new Color(.87f, .87f, 1f));
+            } else {
+                changesList.get(i).setBackground(new Color(0.97f, 0.97f, 0.97f));
+            }
+        }
+    }
+
+    // This isn't hella efficient, but I'll deal with that if the scope ever gets big enough that it matters
+    public void revalidateChangeList() {
+        for (int i = 0; i < changesList.size(); i++) {
+            changesList.get(i).upButton.setEnabled(i != 0);
+            changesList.get(i).downButton.setEnabled(i != changesList.size()-1);
             if (i %2 == 0) {
                 changesList.get(i).setBackground(new Color(.87f, .87f, 1f));
             } else {
@@ -817,20 +893,25 @@ public class MainPanel extends JPanel {
 
                         // Get images of variation
                         try {
-                            Path[] spritesheets = listFiles(variant);
+                            Path[] paths = listFiles(variant);
                             TreeMap<String, BufferedImage> spritesheetImages = new TreeMap<>();
                             TreeMap<String, BufferedImage> spritesheetMasks = new TreeMap<>();
                             TreeMap<String, BufferedImage> spritesheetColorMasks = new TreeMap<>();
-                            for (Path spritesheet : spritesheets) {
-                                String filename = spritesheet.getFileName().toString();
+                            for (Path path : paths) {
+                                String filename = path.getFileName().toString();
                                 if (filename.toLowerCase().endsWith("-mask.png")) {
-                                    spritesheetMasks.put(filename.toLowerCase().replace("-mask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
+                                    spritesheetMasks.put(filename.toLowerCase().replace("-mask.png", ""), ImageIO.read(new File(path.toUri())));
                                 } else if (filename.toLowerCase().endsWith("-colormask.png")) {
-                                    spritesheetColorMasks.put(filename.toLowerCase().replace("-colormask.png", ""), ImageIO.read(new File(spritesheet.toUri())));
+                                    spritesheetColorMasks.put(filename.toLowerCase().replace("-colormask.png", ""), ImageIO.read(new File(path.toUri())));
                                 } else if (filename.toLowerCase().endsWith(".png")) {
-                                    spritesheetImages.put(filename.toLowerCase().replace(".png", ""), ImageIO.read(new File(spritesheet.toUri())));
+                                    spritesheetImages.put(filename.toLowerCase().replace(".png", ""), ImageIO.read(new File(path.toUri())));
+                                } else if (filename.toLowerCase().endsWith(".txt")) {
+                                    if (filename.equals("info.txt")) {
+                                        newVariant.setInfo(new String(Files.readAllBytes(path)));
+                                    }
                                 }
                             }
+
                             newVariant.addImages(spritesheetImages);
                             newVariant.addMasks(spritesheetMasks);
                             newVariant.addColorMasks(spritesheetColorMasks);
