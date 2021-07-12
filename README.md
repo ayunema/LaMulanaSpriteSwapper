@@ -1,20 +1,23 @@
 # LaMulanaSpriteSwapper
 
 Customize, mix, and match sprite sheets without wangjangling the contents of your `data/graphics/00` folder
-![boop](https://i.imgur.com/YroRL0K.gif)
+![boop](https://i.imgur.com/JzjFFNV.gif)
 
 ## How to do the thing
 * The app will try to auto-populate the game directory for you (Feel free to suggest more defaults)
   * If `La-Mulana install directory` is empty, enter the path to your game directory, eg: **C:\Steam\steamapps\common\La-Mulana**
-      *  TODO: App to remember previously entered location
 * Select a `Sprite` from the `Sprite` list box
   * Any appropriate variants will populate the `Variant` list box
 * Select a `Variant` (from the second-from-the-left list box)
-  * You should see an arbirtary image from the set of those that get replaced (This preview area will eventually be used for thumbnails)
+  * ~~You should see an arbirtary image from the set of those that get replaced (This preview area will eventually be used for thumbnails)~~ (Currently no preview exists anymore)
 * Check or uncheck `Fresh start` if you want to modify already-modified files
   * This will only revert to default before modification for files that are edited by this particular variant (*[It's complicated](#why-is-fresh-start-complicated)*)
+* Check or uncheck `Shuffle colors` if you want to randomize how things look a little
+  * If you check `Chaos shuffle` as well, then if the variant has changes across multiple files, it will not attempt to keep them consistent. This causes things to look **really** silly
+* Click `Add to queue` (Or just double-click the desired Variant) to add it to the list of modifications
+  * If you accidentally added something with the wrong settings checked off, you can modify them after they've been added to the queue, using the matching icon checkboxes on the right
 * Click `Apply` to write the changes to your game directory
-  * Might take a couple seconds if there are several files being touched
+  * This might take a few seconds if there are many files being touched
 
 The code is ugly, and will be for a while.
 
@@ -47,7 +50,7 @@ The code is ugly, and will be for a while.
 ## Known Issues
 AKA a lazy TODO list/issue tracker
 
-* App still kinda looks like garbage
+* ~~App still kinda looks like garbage~~ Honestly, I kinda like how it looks, these days
 * Code COULD be less garbagey
 * Needs more sprites/variants
-* Not sure how stuff looks on other Operating Systems, but it's probably all out of whack. (Might have to fall back on the ugly default Look & Feel)
+* Stuff doesn't necessarily look good on all Operating Systems, yet
