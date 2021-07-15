@@ -258,7 +258,7 @@ public class MainPanel extends JPanel {
 
         JButton refreshButton = new JButton("Reload sprites");
         blockables.add(refreshButton);
-        refreshButton.addActionListener(e -> {try {Robot r = new Robot(); r.mouseMove(refreshButton.getLocationOnScreen().x,refreshButton.getLocationOnScreen().y);}catch(Exception ex){}}/*loadSprites()*/);
+        refreshButton.addActionListener(e -> loadSprites());
         spriteListTop.add(refreshButton);
 
         spriteList = new JList2<>();
@@ -573,7 +573,7 @@ public class MainPanel extends JPanel {
             Point p = new Point(Integer.parseInt(pos[0]), Integer.parseInt(pos[1]));
             parent.setLocation(p);
         } catch (Exception ex) {
-            error("No window position", ex);
+            debug("No window position: " + ex);
         }
 
         try {
