@@ -12,6 +12,7 @@ import org.json.JSONObject;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.border.CompoundBorder;
 import javax.swing.event.ListSelectionEvent;
 import java.awt.*;
 import java.awt.event.*;
@@ -22,7 +23,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 
-import static com.project610.Utils.prefSize;
+import static com.project610.Utils.*;
 
 public class MainPanel extends JPanel {
 
@@ -178,7 +179,7 @@ public class MainPanel extends JPanel {
             error("Failed to load icons from resources", ex);
         }
 
-        changesPanel = new JPanel();
+        changesPanel = vbox();
 
         menuBar = new JMenuBar();
         menuBar.setLayout(new BoxLayout(menuBar, BoxLayout.LINE_AXIS));
@@ -231,34 +232,40 @@ public class MainPanel extends JPanel {
         topPane.add(prefSize(redownloadButton, 50, 20));
         redownloadButton.setVisible(false);
 
-        JPanel midPane = new JPanel(new BorderLayout(0, 0));
+        JPanel midPane = hbox();
         if (debug) midPane.setBackground(new Color(1f, 1f, 0f));
         midPane.setBorder(BorderFactory.createLineBorder(Color.lightGray));
 
-        midPane.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        //midPane.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 0));
         add(prefSize(midPane, 700, 300));
 
-        JPanel spriteListPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JPanel spriteListPane = new JPanel(new BorderLayout(5, 5));
+        //JPanel spriteListPane = vbox();
         if (debug) spriteListPane.setBackground(new Color(0.3f, 0.3f, 0.6f));
-        spriteListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
+
+        spriteListPane.setBorder(new CompoundBorder(
+                  BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray)
+                , BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        ));
         midPane.add(prefSize(spriteListPane, 170, 300));
 
-        spriteListPane.add(new JLabel(" Sprite"));
+        JPanel spriteListTop = hbox();
+        spriteListPane.add(spriteListTop, BorderLayout.PAGE_START);
 
-        spriteListPane.add(Box.createRigidArea(new Dimension(1,25)));
-        spriteListPane.add(Box.createHorizontalGlue());
+        spriteListTop.add(new JLabel(" Sprite"));
+
+        spriteListTop.add(Box.createHorizontalGlue());
 
         JButton refreshButton = new JButton("Reload sprites");
         blockables.add(refreshButton);
-        refreshButton.addActionListener(e -> loadSprites());
-        spriteListPane.add(refreshButton);
+        refreshButton.addActionListener(e -> {try {Robot r = new Robot(); r.mouseMove(refreshButton.getLocationOnScreen().x,refreshButton.getLocationOnScreen().y);}catch(Exception ex){}}/*loadSprites()*/);
+        spriteListTop.add(refreshButton);
 
         spriteList = new JList2<>();
         blockables.add(spriteList);
         spriteList.setBorder(BorderFactory.createLineBorder(Color.lightGray));
         spriteList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        spriteList.setVisibleRowCount(12);
-        spriteListPane.add(prefSize(spriteList, 159, 260));
+        spriteListPane.add(spriteList, BorderLayout.CENTER);
 
         spriteList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) return;
@@ -268,20 +275,26 @@ public class MainPanel extends JPanel {
             variantInfoButton.setEnabled(false);
         });
 
-        JPanel variantListPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel variantListPane = new JPanel(new BorderLayout(5,5));
         if (debug) variantListPane.setBackground(new Color(0.4f, 0.4f, 0.8f));
-        variantListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
+
+        JPanel variantListTop = hbox();
+        variantListPane.add(variantListTop, BorderLayout.PAGE_START);
+
+        variantListPane.setBorder(new CompoundBorder(
+                  BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray)
+                , BorderFactory.createEmptyBorder(5,5,5,5)
+        ));
         midPane.add(prefSize(variantListPane, 170, 300));
 
-        variantListPane.add(new JLabel(" Variant"));
+        variantListTop.add(new JLabel(" Variant"));
         variantInfoButton = new JButton ("Info");
         variantInfoButton.setEnabled(false);
         variantInfoButton.addActionListener(e -> showVariantInfo(currentVariant()));
 
-        variantListPane.add(Box.createRigidArea(new Dimension(45,25)));
-        variantListPane.add(Box.createHorizontalGlue());
+        variantListTop.add(Box.createHorizontalGlue());
 
-        variantListPane.add(variantInfoButton);
+        variantListTop.add(variantInfoButton);
 
 
 
@@ -291,7 +304,7 @@ public class MainPanel extends JPanel {
         blockables.add(variantList);
         variantList.setBorder(BorderFactory.createLineBorder(Color.lightGray));
         variantList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        variantListPane.add(prefSize(variantList, 159, 260));
+        variantListPane.add(prefSize(variantList, 159, 260), BorderLayout.CENTER);
 
         variantList.addMouseListener(new MouseListener() {
             @Override
@@ -430,7 +443,6 @@ public class MainPanel extends JPanel {
 
 
 
-        changesPanel.setLayout(new BoxLayout(changesPanel, BoxLayout.Y_AXIS));
         changesPanel.setBackground(new Color(1f, 1f, 1f));
         JScrollPane changeScroll = new JScrollPane(changesPanel, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         //changesList = new JList2<JPanel>();
@@ -442,8 +454,7 @@ public class MainPanel extends JPanel {
         addButton.addActionListener(e -> newChange());
         previewPane.add(prefSize(addButton, 342, 20));
 
-        JPanel changesLegendPanel = new JPanel();
-        changesLegendPanel.setLayout(new BoxLayout(changesLegendPanel, BoxLayout.LINE_AXIS));
+        JPanel changesLegendPanel = hbox();
         changesLegendPanel.add(new JLabel("  Sprite/Variant"));
         changesLegendPanel.add(Box.createHorizontalGlue());
         changesLegendPanel.add(new JLabel(icons.get("freshstart")));
@@ -497,13 +508,17 @@ public class MainPanel extends JPanel {
         imageView = new JLabel();
         //previewPane.add(prefSize(imageView, 300, 270));
 
-        JPanel bottomPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel bottomPane = new JPanel(new BorderLayout(5,5));
         if (debug) bottomPane.setBackground(new Color(0f, 1f, 0f));
         add(prefSize(bottomPane, 700, 220));
+        bottomPane.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
 
-        bottomPane.add(prefSize(new JLabel("   Console"), 80, 20));
+        JPanel bottomPaneTop = hbox();
+        bottomPane.add(bottomPaneTop, BorderLayout.PAGE_START);
+
+        bottomPaneTop.add(prefSize(new JLabel("   Console"), 80, 20));
         JButton clearConsoleButton = new JButton("x");
-        bottomPane.add(clearConsoleButton);
+        bottomPaneTop.add(clearConsoleButton);
         clearConsoleButton.addActionListener(e -> console.setText(""));
 
         console = new JTextArea();

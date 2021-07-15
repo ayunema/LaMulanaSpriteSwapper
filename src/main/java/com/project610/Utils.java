@@ -1,5 +1,6 @@
 package com.project610;
 
+import javax.swing.*;
 import java.awt.*;
 import java.io.Closeable;
 import java.io.File;
@@ -173,12 +174,34 @@ public class Utils {
         return component;
     }
 
+    public static Component minSize(Component component, int w, int h) {
+        component.setMinimumSize(new Dimension(w, h));
+        return component;
+    }
+
+    public static Component maxSize(Component component, int w, int h) {
+        component.setMaximumSize(new Dimension(w, h));
+        return component;
+    }
+
     public static void closeThing(Closeable s) {
         try {
             if (null != s) s.close();
         } catch (Exception ex) {
             // Nyeh!
         }
+    }
+
+    public static JPanel hbox() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.LINE_AXIS));
+        return panel;
+    }
+
+    public static JPanel vbox() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.PAGE_AXIS));
+        return panel;
     }
 
 
