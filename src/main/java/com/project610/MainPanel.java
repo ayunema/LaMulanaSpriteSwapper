@@ -121,7 +121,7 @@ public class MainPanel extends JPanel {
         removeAll();
         blockables = new HashSet<>();
 
-        setLayout(new BorderLayout(0, 0));
+        setLayout(new BoxLayout(this, BoxLayout.PAGE_AXIS));
 
         if (debug) setBackground(new Color (0.3f, 0.3f, 0.3f));
 
@@ -181,17 +181,23 @@ public class MainPanel extends JPanel {
         changesPanel = new JPanel();
 
         menuBar = new JMenuBar();
-        menuBar.add(new JMenu("Farts", false));
-        menuBar.add(new JMenu("Butts", true));
+        menuBar.setLayout(new BoxLayout(menuBar, BoxLayout.LINE_AXIS));
+        JMenu stuffMenu = new JMenu("Stuff");
+        JMenuItem downloadSpritesButton = new JMenuItem("Check online for new sprites");
+        downloadSpritesButton.addActionListener(e -> downloadSprites());
+        stuffMenu.add(downloadSpritesButton);
+        menuBar.add(stuffMenu);
+
+        menuBar.add(Box.createHorizontalGlue());
 
         menuBar.setVisible(true);
 
-        //add(menuBar, BorderLayout.PAGE_START);
+        add(menuBar);
 
         JPanel topPane = new JPanel();
         if (debug) topPane.setBackground(new Color(1f, 0f, 0f));
         topPane.setLayout(new FlowLayout(FlowLayout.LEFT));
-        add(prefSize(topPane, 700, 30), BorderLayout.PAGE_START);
+        add(prefSize(topPane, 700, 30));
 
         topPane.add(prefSize(new JLabel("La-Mulana install directory"), 155, 20));
 
@@ -230,7 +236,7 @@ public class MainPanel extends JPanel {
         midPane.setBorder(BorderFactory.createLineBorder(Color.lightGray));
 
         midPane.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        add(prefSize(midPane, 700, 300), BorderLayout.CENTER);
+        add(prefSize(midPane, 700, 300));
 
         JPanel spriteListPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
         if (debug) spriteListPane.setBackground(new Color(0.3f, 0.3f, 0.6f));
@@ -265,7 +271,7 @@ public class MainPanel extends JPanel {
         JPanel variantListPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
         if (debug) variantListPane.setBackground(new Color(0.4f, 0.4f, 0.8f));
         variantListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
-        midPane.add(prefSize(variantListPane, 170, 300), BorderLayout.CENTER);
+        midPane.add(prefSize(variantListPane, 170, 300));
 
         variantListPane.add(new JLabel(" Variant"));
         variantInfoButton = new JButton ("Info");
@@ -493,7 +499,7 @@ public class MainPanel extends JPanel {
 
         JPanel bottomPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
         if (debug) bottomPane.setBackground(new Color(0f, 1f, 0f));
-        add(prefSize(bottomPane, 700, 220), BorderLayout.PAGE_END);
+        add(prefSize(bottomPane, 700, 220));
 
         bottomPane.add(prefSize(new JLabel("   Console"), 80, 20));
         JButton clearConsoleButton = new JButton("x");
