@@ -91,8 +91,10 @@ public class SpriteDownloader implements Runnable {
 
                             if (zipChecksum.equalsIgnoreCase(localChecksum)) {
                                 // No need to do do anything
+                                mainPanel.debug("Checksum match, ignoring: " + outputPath);
                             } else {
                                 mismatches.put(outputPath, fileSystem.getPath(entry.getName()));
+                                mainPanel.debug("Checksum mismatch! Stashing: " + outputPath);
                             }
                         }
                         catch (Exception ex) {
