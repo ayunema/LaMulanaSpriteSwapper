@@ -14,10 +14,7 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
 import java.awt.*;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -89,8 +86,11 @@ public class MainPanel extends JPanel {
     public HashMap<Color, Float[]> adjustments = new HashMap<>(); // Remember to reset this when changing between variants/spritesheets!
     public TreeMap<String, Preset> presets = new TreeMap<>();
     public JComboBox<String> presetBox;
+    private JButton variantInfoButton;
 
-    private JFrame parent;
+    private JMenuBar menuBar;
+
+    public JFrame parent;
     private HashSet<Component> blockables;
 
     MainPanel(String[] args, JFrame parent) {
@@ -180,6 +180,14 @@ public class MainPanel extends JPanel {
 
         changesPanel = new JPanel();
 
+        menuBar = new JMenuBar();
+        menuBar.add(new JMenu("Farts", false));
+        menuBar.add(new JMenu("Butts", true));
+
+        menuBar.setVisible(true);
+
+        //add(menuBar, BorderLayout.PAGE_START);
+
         JPanel topPane = new JPanel();
         if (debug) topPane.setBackground(new Color(1f, 0f, 0f));
         topPane.setLayout(new FlowLayout(FlowLayout.LEFT));
@@ -212,7 +220,10 @@ public class MainPanel extends JPanel {
         });
         topPane.add(prefSize(textSizeUpButton, 20, 20));
 
-
+        JButton redownloadButton = new JButton("DL");
+        redownloadButton.addActionListener(e -> downloadSprites());
+        topPane.add(prefSize(redownloadButton, 50, 20));
+        redownloadButton.setVisible(false);
 
         JPanel midPane = new JPanel(new BorderLayout(0, 0));
         if (debug) midPane.setBackground(new Color(1f, 1f, 0f));
@@ -224,7 +235,7 @@ public class MainPanel extends JPanel {
         JPanel spriteListPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
         if (debug) spriteListPane.setBackground(new Color(0.3f, 0.3f, 0.6f));
         spriteListPane.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.lightGray));
-        midPane.add(prefSize(spriteListPane, 170, 300), BorderLayout.LINE_START);
+        midPane.add(prefSize(spriteListPane, 170, 300));
 
         spriteListPane.add(new JLabel(" Sprite"));
 
@@ -248,6 +259,7 @@ public class MainPanel extends JPanel {
 
             variantList.clear();
             variantList.addAll(sprites.get(spriteList.getSelectedValue()).variants.keySet());
+            variantInfoButton.setEnabled(false);
         });
 
         JPanel variantListPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -256,7 +268,7 @@ public class MainPanel extends JPanel {
         midPane.add(prefSize(variantListPane, 170, 300), BorderLayout.CENTER);
 
         variantListPane.add(new JLabel(" Variant"));
-        JButton variantInfoButton = new JButton ("Info");
+        variantInfoButton = new JButton ("Info");
         variantInfoButton.setEnabled(false);
         variantInfoButton.addActionListener(e -> showVariantInfo(currentVariant()));
 
@@ -377,8 +389,8 @@ public class MainPanel extends JPanel {
         JPanel previewPane = new JPanel();
         if (debug) previewPane.setBackground(new Color(0.6f, 0.6f, 1.0f));
         previewPane.setLayout(new FlowLayout(FlowLayout.LEFT));
-        midPane.add(previewPane, BorderLayout.LINE_END);
-        midPane.add(prefSize(previewPane, 350, 300), BorderLayout.LINE_END);
+        midPane.add(previewPane);
+        midPane.add(prefSize(previewPane, 350, 300));
 
         JLabel freshStartLabel = new JLabel(icons.get("freshstart"));
         previewPane.add(freshStartLabel);
@@ -497,6 +509,52 @@ public class MainPanel extends JPanel {
         bottomPane.add(prefSize(consoleScroll, 680, 180));
 
 
+        parent.addWindowListener(new WindowListener() {
+            @Override
+            public void windowOpened(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowClosing(WindowEvent e) {
+                settings.put("windowPos", parent.getLocationOnScreen().x + "," + parent.getLocationOnScreen().y);
+                writeSettings();
+            }
+
+            @Override
+            public void windowClosed(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowIconified(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowDeiconified(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowActivated(WindowEvent e) {
+
+            }
+
+            @Override
+            public void windowDeactivated(WindowEvent e) {
+
+            }
+        });
+
+        try {
+            String[] pos = settings.getString("windowPos").split(",");
+            Point p = new Point(Integer.parseInt(pos[0]), Integer.parseInt(pos[1]));
+            parent.setLocation(p);
+        } catch (Exception ex) {
+            error("No window position", ex);
+        }
+
         try {
             fontSize = settings.getFloat("fontSize");
             changeFont(this, fontSize);
@@ -519,7 +577,7 @@ public class MainPanel extends JPanel {
     public void showVariantInfo(Variant variant) {
         Variant currentVariant = currentVariant(); //                                      v---------- But why -----------v
         JDialog infoDialog = new JDialog(parent, "Variant info: " + currentSprite().label + " / " + currentVariant.name);
-
+/*
         infoDialog.addKeyListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
@@ -536,7 +594,7 @@ public class MainPanel extends JPanel {
                 System.out.println(e);
             }
         });
-
+*/
         infoDialog.setSize(500,150);
         infoDialog.setLocation(parent.getLocation().x + 100, parent.getLocation().y + 200);
         infoDialog.setModal(true);
@@ -692,6 +750,7 @@ public class MainPanel extends JPanel {
 
     public void writeSettings() {
         try {
+            // Write stuff
             Files.write(settingsPath, settings.toString().getBytes());
         } catch (Exception ex) {
             error("Failed to write settings to file", ex);
@@ -803,7 +862,6 @@ public class MainPanel extends JPanel {
         }
     }
 
-    // TODO: Thread-ify this bad boy, to stop UI from freezing
     public void downloadSprites() {
         newVersion = false; // Probably don't need to prompt for new-version stuff if we just downloaded stuff
         new Thread(spriteDownloader).start();
