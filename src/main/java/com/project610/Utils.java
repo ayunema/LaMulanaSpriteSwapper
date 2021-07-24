@@ -17,6 +17,8 @@ import java.util.List;
  * I am become spaghetti, destroyer of readability
  */
 public class Utils {
+    final public static String SLASH = File.separator;
+
     public static Path exportResources(String source, String dest) throws Exception {
         Path toReturn = null;
         URI uri = Utils.class.getClassLoader().getResource(source).toURI();

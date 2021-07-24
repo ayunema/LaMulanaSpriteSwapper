@@ -14,6 +14,7 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.CompoundBorder;
 import javax.swing.event.ListSelectionEvent;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
@@ -37,8 +38,9 @@ public class MainPanel extends JPanel {
     private final int SHUFFLE_BRIGHTNESS_ONLY_DOWN = 301;
     private final int SHUFFLE_BRIGHTNESS_ONLY_UP = 302;
 
-    private final int transparentRgb = new Color(0,0,0,0).getRGB();
-    private final int blackRgb = new Color(0,0,0).getRGB();
+    private final int transparentRgb = new Color(0f,0f,0f,0f).getRGB();
+    private final int blackRgb = new Color(0f,0f,0f).getRGB();
+    private final int whiteRgb = new Color(1f,1f,1f).getRGB();
 
     private JTextField installDirBox;
     public JList2<String> spriteList;
@@ -57,10 +59,11 @@ public class MainPanel extends JPanel {
     JPanel changesPanel;
     public HashMap<String, Icon> icons;
 
-    private String graphicsPath = "data" + File.separator + "graphics" + File.separator + "00";
+    private String graphicsPath = "data" + SLASH + "graphics" + SLASH + "00";
     private String spritesDirName = "sprites";
     private String presetsDirName = "presets";
-    private Path spritesPath;
+    private Path spritesPath = Paths.get("sprites");
+    private Path defaultSpritesPath = Paths.get(spritesPath + SLASH + ".EVERYTHING" + SLASH + "DEFAULT");
     public String extension = ".png";
     public final String THUMBNAIL_NAME = "thumbnail";
     private float fontSize = 11f;
@@ -182,18 +185,21 @@ public class MainPanel extends JPanel {
         changesPanel = vbox();
 
         menuBar = new JMenuBar();
+        add(menuBar);
         menuBar.setLayout(new BoxLayout(menuBar, BoxLayout.LINE_AXIS));
         JMenu stuffMenu = new JMenu("Stuff");
+        menuBar.add(stuffMenu);
+
         JMenuItem downloadSpritesButton = new JMenuItem("Check online for new sprites");
         downloadSpritesButton.addActionListener(e -> downloadSprites());
         stuffMenu.add(downloadSpritesButton);
-        menuBar.add(stuffMenu);
+
+        JMenuItem generateAlphaMaskButton = new JMenuItem("Generate Alpha Mask from spritesheet");
+        generateAlphaMaskButton.addActionListener(e -> generateAlphaMask());
+        stuffMenu.add(generateAlphaMaskButton);
+
 
         menuBar.add(Box.createHorizontalGlue());
-
-        menuBar.setVisible(true);
-
-        add(menuBar);
 
         JPanel topPane = new JPanel();
         if (debug) topPane.setBackground(new Color(1f, 0f, 0f));
@@ -496,9 +502,6 @@ public class MainPanel extends JPanel {
 
 
 
-
-
-
         /*JButton colorButton = new JButton("†");
         previewPane.add(prefSize(colorButton, 10, 10));
         colorButton.addActionListener(e -> {
@@ -593,6 +596,166 @@ public class MainPanel extends JPanel {
 
 
         console.append(":)");
+    }
+
+    // Try to generate an alpha mask (-MASK.png) for a spritesheet based on the original graphics
+    //  (eg: Block out regions based on masks I may or may not have even made yet) (TODO - WIP)
+    private void generateAlphaMask() {
+        Path[] paths = getPathsFromDialog();
+        if (paths.length == 0) {
+            warn ("No path selected, cancelling alpha-mask generation");
+            return;
+        }
+
+        for (Path path : paths) {
+            info("Generating alpha-mask for: " + path.toString());
+
+            if (path.getParent().normalize().toString().endsWith(defaultSpritesPath.normalize().toString())) {
+                warn(" > Yo, I don't think you should be messing with .EVERYTHING/DEFAULT. Maybe make a copy or something? Giving up!");
+                continue;
+            }
+
+            String justFilename = path.toString().substring(path.toString().lastIndexOf(SLASH) + 1);
+            String justFileExtension = justFilename.substring(justFilename.lastIndexOf('.'));
+            justFilename = justFilename.substring(0, justFilename.lastIndexOf('.'));
+
+            Path defaultFilePath = Paths.get(defaultSpritesPath + SLASH + justFilename + justFileExtension);
+            if (!Files.exists(defaultFilePath)) {
+                warn(" > Couldn't find `.EVERYTHING/DEFAULT` equivalent at: " + defaultFilePath.toString() + "; Giving up!");
+                continue;
+            } else if (justFilename.toLowerCase().endsWith("-mask") || justFilename.toLowerCase().endsWith("-colormask")) {
+                warn(" > Doesn't really make sense to make a mask of a mask... Giving up!");
+                continue;
+            }
+
+            Path defaultMaskPath = Paths.get(defaultSpritesPath + SLASH + justFilename + "-MASK.png");
+
+            if (Files.exists(defaultMaskPath)) {
+                info(" > Found mask for original file!");
+                try {
+                    BufferedImage newSprite = ImageIO.read(new File(path.toUri()));
+                    BufferedImage newMask = new BufferedImage(newSprite.getWidth(), newSprite.getHeight(), newSprite.getType());
+                    BufferedImage defaultSprite = ImageIO.read(new File(defaultFilePath.toUri()));
+                    BufferedImage defaultMask = ImageIO.read(new File(defaultMaskPath.toUri()));
+
+                    // Scan image for mismatch to original, if any mismatch is found, mask the whole color-region based on the default mask
+                    for (int y = 0; y < newMask.getHeight(); y++) {
+                        for (int x = 0; x < newMask.getWidth(); x++) {
+                            // Default to black
+                            if (new Color(newMask.getRGB(x, y), true).getAlpha() == 0) {
+                                newMask.setRGB(x, y, blackRgb);
+                            }
+
+                            // Don't bother if it's transparent. That's kinda the whole point of all this
+                            if (new Color(newSprite.getRGB(x, y), true).getAlpha() == 0) {
+                                continue;
+                            }
+
+                            if (newSprite.getRGB(x, y) != defaultSprite.getRGB(x, y)) {
+                                if (newMask.getRGB(x, y) == blackRgb) {
+                                    // Match found! Scan default mask for other pixels sharing the mask colour, mark them, and neutralize image in memory for efficiency and stuff
+                                    int defaultMaskRGB = defaultMask.getRGB(x, y);
+                                    // But only if there's no mask there, otherwise probably just do nothing
+                                    if (new Color(defaultMaskRGB, true).getAlpha() != 0) {
+                                        // Hate that I have to start from y2=0, but it's possible things will get skipped due to transparency early on
+                                        for (int y2 = 0; y2 < newSprite.getHeight(); y2++) {
+                                            for (int x2 = 0; x2 < newSprite.getWidth(); x2++) {
+                                                if (defaultMask.getRGB(x2, y2) == defaultMaskRGB) {
+                                                    newMask.setRGB(x2, y2, whiteRgb);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Do a once-over to see if anything can be scrapped from the original
+                    boolean suggestNewSpritesheet = false;
+                    for (int y = 0; y < newSprite.getHeight(); y++) {
+                        for (int x = 0; x < newSprite.getWidth(); x++) {
+                            // If the new sprite matches the original thing, there's not much reason to have it, so propose removing that bit and just not masking it
+                            //  (Probably gonna have issues with overlays on this one)
+                            if (new Color(newSprite.getRGB(x, y),true).getAlpha() != 0 && newMask.getRGB(x, y) == blackRgb && newSprite.getRGB(x, y) == defaultSprite.getRGB(x, y)) {
+                                newSprite.setRGB(x, y, transparentRgb);
+                                suggestNewSpritesheet = true;
+                            }
+                        }
+                    }
+                    // When all is said and done, save the thing
+                    ImageIO.write(newMask, "png", new File(path.getParent().toString() + SLASH + justFilename + "-MASK-maybe.png"));
+                    if (suggestNewSpritesheet) {
+                        ImageIO.write(newSprite, "png", new File(path.getParent().toString() + SLASH + justFilename + "-maybe.png"));
+                    }
+                    info("God I hope that didn't break anything...");
+
+                } catch (Exception ex) {
+                    error("Messed up generating alpha mask", ex);
+                }
+            } else {
+                warn(" > No mask found for original file. "/* This is gonna be janky... When it's supported at all... */+ "Giving up!");
+                continue;
+            }
+        }
+    }
+
+    private Path[] getPathsFromDialog() {
+        Path[] paths = null;
+        JDialog dialog = new JDialog(parent, "Select a file");
+
+        dialog.setSize((int) (parent.getWidth() / 1.25), (int) (parent.getHeight() / 1.25));
+        dialog.setLocation(parent.getLocationOnScreen().x + 50, parent.getLocationOnScreen().y + 50);
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout(5, 5));
+        dialog.setContentPane(panel);
+
+        String dir;
+        try {
+            dir = settings.getString("alphaMaskDir");
+        } catch (Exception ex) {
+            dir = spritesDirName;
+        }
+
+        JFileChooser chooser = new JFileChooser(dir);
+        chooser.setMultiSelectionEnabled(true);
+        chooser.setAcceptAllFileFilterUsed(false);
+        chooser.addChoosableFileFilter(new FileNameExtensionFilter("PNG Images", "png"));
+
+        chooser.addActionListener(e -> {
+            if (e.getActionCommand().equalsIgnoreCase("CancelSelection")) {
+                dialog.dispose();
+            } else if (e.getActionCommand().equalsIgnoreCase("ApproveSelection")) {
+                setTempPaths(chooser.getSelectedFiles());
+                dialog.dispose();
+            }
+            debug ("File Chooser: " + e.getActionCommand());
+            if (null != chooser.getSelectedFile()) {
+                debug ("   > " + chooser.getSelectedFile().toPath().toString());
+            }
+        });
+        panel.add(chooser, BorderLayout.CENTER);
+
+        dialog.setModal(true);
+        dialog.setVisible(true);
+
+        paths = tempPaths;
+        if (paths.length > 0) {
+            settings.put("alphaMaskDir", paths[0].getParent().toString());
+        }
+        tempPaths = new Path[0];
+
+        return paths;
+    }
+
+    // Lazy hack 'cause apparently I can't set the value of a var outside of a lambda method
+    Path[] tempPaths = new Path[0];
+    public void setTempPaths(File[] files) {
+        tempPaths = new Path[files.length];
+        for (int i = 0; i < files.length; i++) {
+            tempPaths[i] = files[i].toPath();
+        }
     }
 
     public void showVariantInfo(Variant variant) {
@@ -947,7 +1110,6 @@ public class MainPanel extends JPanel {
             spriteList.clear();
             variantList.clear();
 
-            spritesPath = Paths.get("sprites");
             Path[] spriteFiles = listFiles(spritesPath);
 
             // Get all sprite options
@@ -1126,7 +1288,7 @@ public class MainPanel extends JPanel {
     */
 
     public String path() {
-        return installDirBox.getText() + File.separator + graphicsPath;
+        return installDirBox.getText() + SLASH + graphicsPath;
     }
 
     public TreeMap<String, BufferedImage> generateImagesForVariant(Sprite sprite, Variant variant, boolean freshStart, boolean shuffleColors, boolean chaosShuffle) {
@@ -1168,15 +1330,15 @@ public class MainPanel extends JPanel {
     }
 
     private BufferedImage generateImageForVariant(Sprite sprite, Variant variant, String key, boolean freshStart, boolean shuffleColors, boolean chaosShuffle) {
-        info("Generating image: " + path() + File.separator + key + extension);
+        info("Generating image: " + path() + SLASH + key + extension);
         BufferedImage newImage = null;
         if (freshStart) {
             newImage = copyImage(sprite.variants.get("DEFAULT").spritesheetImages.get(key));
         } else {
             try {
-                newImage = ImageIO.read(new File(path() + File.separator + key + extension));
+                newImage = ImageIO.read(new File(path() + SLASH + key + extension));
             } catch (Exception ex) {
-                error("Could not find/load base image at: " + path() + File.separator + key + extension, ex);
+                error("Could not find/load base image at: " + path() + SLASH + key + extension, ex);
             }
         }
         BufferedImage replacement = variant.spritesheetImages.get(key);
