@@ -1,5 +1,6 @@
 package com.project610;
 
+import com.project610.runnables.AlphaMaskGenerator;
 import com.project610.runnables.ImageGenerator;
 import com.project610.runnables.SpriteDownloader;
 import com.project610.structs.JList2;
@@ -38,9 +39,9 @@ public class MainPanel extends JPanel {
     private final int SHUFFLE_BRIGHTNESS_ONLY_DOWN = 301;
     private final int SHUFFLE_BRIGHTNESS_ONLY_UP = 302;
 
-    private final int transparentRgb = new Color(0f,0f,0f,0f).getRGB();
-    private final int blackRgb = new Color(0f,0f,0f).getRGB();
-    private final int whiteRgb = new Color(1f,1f,1f).getRGB();
+    public final int transparentRgb = new Color(0f,0f,0f,0f).getRGB();
+    public final int blackRgb = new Color(0f,0f,0f).getRGB();
+    public final int whiteRgb = new Color(1f,1f,1f).getRGB();
 
     private JTextField installDirBox;
     public JList2<String> spriteList;
@@ -63,7 +64,7 @@ public class MainPanel extends JPanel {
     private String spritesDirName = "sprites";
     private String presetsDirName = "presets";
     private Path spritesPath = Paths.get("sprites");
-    private Path defaultSpritesPath = Paths.get(spritesPath + SLASH + ".EVERYTHING" + SLASH + "DEFAULT");
+    public Path defaultSpritesPath = Paths.get(spritesPath + SLASH + ".EVERYTHING" + SLASH + "DEFAULT");
     public String extension = ".png";
     public final String THUMBNAIL_NAME = "thumbnail";
     private float fontSize = 11f;
@@ -71,6 +72,7 @@ public class MainPanel extends JPanel {
     private final Path settingsPath = Paths.get("lmss-settings.json");
 
     ImageGenerator imageGenerator = new ImageGenerator(this);
+    AlphaMaskGenerator alphaMaskGenerator = new AlphaMaskGenerator(this);
     SpriteDownloader spriteDownloader = new SpriteDownloader(this);
 
     private boolean debug = false;
@@ -189,6 +191,7 @@ public class MainPanel extends JPanel {
         menuBar.setLayout(new BoxLayout(menuBar, BoxLayout.LINE_AXIS));
         JMenu stuffMenu = new JMenu("Stuff");
         menuBar.add(stuffMenu);
+        blockables.add(stuffMenu);
 
         JMenuItem downloadSpritesButton = new JMenuItem("Check online for new sprites");
         downloadSpritesButton.addActionListener(e -> downloadSprites());
@@ -232,11 +235,6 @@ public class MainPanel extends JPanel {
             writeSettings();
         });
         topPane.add(prefSize(textSizeUpButton, 20, 20));
-
-        JButton redownloadButton = new JButton("DL");
-        redownloadButton.addActionListener(e -> downloadSprites());
-        topPane.add(prefSize(redownloadButton, 50, 20));
-        redownloadButton.setVisible(false);
 
         JPanel midPane = hbox();
         if (debug) midPane.setBackground(new Color(1f, 1f, 0f));
@@ -456,6 +454,7 @@ public class MainPanel extends JPanel {
 
 
         addButton = new JButton("Add to queue");
+        blockables.add(addButton);
         addButton.setEnabled(false);
         addButton.addActionListener(e -> newChange());
         previewPane.add(prefSize(addButton, 342, 20));
@@ -474,6 +473,7 @@ public class MainPanel extends JPanel {
 
 
         presetBox = new JComboBox<>();
+        blockables.add(presetBox);
         presetBox.setEditable(true);
         presetBox.addActionListener(e -> {
             if (null != presetBox.getSelectedItem() && !loadingPresets) {
@@ -484,6 +484,7 @@ public class MainPanel extends JPanel {
         previewPane.add(prefSize(presetBox, 160, 22));
 
         JButton savePresetButton = new JButton("Save preset");
+        blockables.add(savePresetButton);
         savePresetButton.addActionListener(e -> savePreset((String)presetBox.getSelectedItem()));
         previewPane.add(prefSize(savePresetButton, 90, 22));
 
@@ -606,103 +607,13 @@ public class MainPanel extends JPanel {
             warn ("No path selected, cancelling alpha-mask generation");
             return;
         }
-
-        for (Path path : paths) {
-            info("Generating alpha-mask for: " + path.toString());
-
-            if (path.getParent().normalize().toString().endsWith(defaultSpritesPath.normalize().toString())) {
-                warn(" > Yo, I don't think you should be messing with .EVERYTHING/DEFAULT. Maybe make a copy or something? Giving up!");
-                continue;
-            }
-
-            String justFilename = path.toString().substring(path.toString().lastIndexOf(SLASH) + 1);
-            String justFileExtension = justFilename.substring(justFilename.lastIndexOf('.'));
-            justFilename = justFilename.substring(0, justFilename.lastIndexOf('.'));
-
-            Path defaultFilePath = Paths.get(defaultSpritesPath + SLASH + justFilename + justFileExtension);
-            if (!Files.exists(defaultFilePath)) {
-                warn(" > Couldn't find `.EVERYTHING/DEFAULT` equivalent at: " + defaultFilePath.toString() + "; Giving up!");
-                continue;
-            } else if (justFilename.toLowerCase().endsWith("-mask") || justFilename.toLowerCase().endsWith("-colormask")) {
-                warn(" > Doesn't really make sense to make a mask of a mask... Giving up!");
-                continue;
-            }
-
-            Path defaultMaskPath = Paths.get(defaultSpritesPath + SLASH + justFilename + "-MASK.png");
-
-            if (Files.exists(defaultMaskPath)) {
-                info(" > Found mask for original file!");
-                try {
-                    BufferedImage newSprite = ImageIO.read(new File(path.toUri()));
-                    BufferedImage newMask = new BufferedImage(newSprite.getWidth(), newSprite.getHeight(), newSprite.getType());
-                    BufferedImage defaultSprite = ImageIO.read(new File(defaultFilePath.toUri()));
-                    BufferedImage defaultMask = ImageIO.read(new File(defaultMaskPath.toUri()));
-
-                    // Scan image for mismatch to original, if any mismatch is found, mask the whole color-region based on the default mask
-                    for (int y = 0; y < newMask.getHeight(); y++) {
-                        for (int x = 0; x < newMask.getWidth(); x++) {
-                            // Default to black
-                            if (new Color(newMask.getRGB(x, y), true).getAlpha() == 0) {
-                                newMask.setRGB(x, y, blackRgb);
-                            }
-
-                            // Don't bother if it's transparent. That's kinda the whole point of all this
-                            if (new Color(newSprite.getRGB(x, y), true).getAlpha() == 0) {
-                                continue;
-                            }
-
-                            if (newSprite.getRGB(x, y) != defaultSprite.getRGB(x, y)) {
-                                if (newMask.getRGB(x, y) == blackRgb) {
-                                    // Match found! Scan default mask for other pixels sharing the mask colour, mark them, and neutralize image in memory for efficiency and stuff
-                                    int defaultMaskRGB = defaultMask.getRGB(x, y);
-                                    // But only if there's no mask there, otherwise probably just do nothing
-                                    if (new Color(defaultMaskRGB, true).getAlpha() != 0) {
-                                        // Hate that I have to start from y2=0, but it's possible things will get skipped due to transparency early on
-                                        for (int y2 = 0; y2 < newSprite.getHeight(); y2++) {
-                                            for (int x2 = 0; x2 < newSprite.getWidth(); x2++) {
-                                                if (defaultMask.getRGB(x2, y2) == defaultMaskRGB) {
-                                                    newMask.setRGB(x2, y2, whiteRgb);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Do a once-over to see if anything can be scrapped from the original
-                    boolean suggestNewSpritesheet = false;
-                    for (int y = 0; y < newSprite.getHeight(); y++) {
-                        for (int x = 0; x < newSprite.getWidth(); x++) {
-                            // If the new sprite matches the original thing, there's not much reason to have it, so propose removing that bit and just not masking it
-                            //  (Probably gonna have issues with overlays on this one)
-                            if (new Color(newSprite.getRGB(x, y),true).getAlpha() != 0 && newMask.getRGB(x, y) == blackRgb && newSprite.getRGB(x, y) == defaultSprite.getRGB(x, y)) {
-                                newSprite.setRGB(x, y, transparentRgb);
-                                suggestNewSpritesheet = true;
-                            }
-                        }
-                    }
-                    // When all is said and done, save the thing
-                    ImageIO.write(newMask, "png", new File(path.getParent().toString() + SLASH + justFilename + "-MASK-maybe.png"));
-                    if (suggestNewSpritesheet) {
-                        ImageIO.write(newSprite, "png", new File(path.getParent().toString() + SLASH + justFilename + "-maybe.png"));
-                    }
-                    info("God I hope that didn't break anything...");
-
-                } catch (Exception ex) {
-                    error("Messed up generating alpha mask", ex);
-                }
-            } else {
-                warn(" > No mask found for original file. "/* This is gonna be janky... When it's supported at all... */+ "Giving up!");
-                continue;
-            }
-        }
+        alphaMaskGenerator.paths = paths;
+        new Thread(alphaMaskGenerator).start();
     }
 
     private Path[] getPathsFromDialog() {
         Path[] paths = null;
-        JDialog dialog = new JDialog(parent, "Select a file");
+        JDialog dialog = new JDialog(parent, "Select file(s)");
 
         dialog.setSize((int) (parent.getWidth() / 1.25), (int) (parent.getHeight() / 1.25));
         dialog.setLocation(parent.getLocationOnScreen().x + 50, parent.getLocationOnScreen().y + 50);
@@ -727,7 +638,7 @@ public class MainPanel extends JPanel {
             if (e.getActionCommand().equalsIgnoreCase("CancelSelection")) {
                 dialog.dispose();
             } else if (e.getActionCommand().equalsIgnoreCase("ApproveSelection")) {
-                setTempPaths(chooser.getSelectedFiles());
+                setAlphaMaskGenPaths(chooser.getSelectedFiles());
                 dialog.dispose();
             }
             debug ("File Chooser: " + e.getActionCommand());
@@ -740,21 +651,21 @@ public class MainPanel extends JPanel {
         dialog.setModal(true);
         dialog.setVisible(true);
 
-        paths = tempPaths;
+        paths = alphaMaskGenPaths;
         if (paths.length > 0) {
             settings.put("alphaMaskDir", paths[0].getParent().toString());
         }
-        tempPaths = new Path[0];
+        alphaMaskGenPaths = new Path[0];
 
         return paths;
     }
 
     // Lazy hack 'cause apparently I can't set the value of a var outside of a lambda method
-    Path[] tempPaths = new Path[0];
-    public void setTempPaths(File[] files) {
-        tempPaths = new Path[files.length];
+    public Path[] alphaMaskGenPaths = new Path[0];
+    public void setAlphaMaskGenPaths(File[] files) {
+        alphaMaskGenPaths = new Path[files.length];
         for (int i = 0; i < files.length; i++) {
-            tempPaths[i] = files[i].toPath();
+            alphaMaskGenPaths[i] = files[i].toPath();
         }
     }
 
@@ -1333,6 +1244,8 @@ public class MainPanel extends JPanel {
         info("Generating image: " + path() + SLASH + key + extension);
         BufferedImage newImage = null;
         if (freshStart) {
+            // TODO: It occurs to me that Fresh Start is kinda dumb, and needs reworking. Saving that for 0.8 or something
+            //      Maybe just reference .EVERYTHING/DEFAULT instead?
             newImage = copyImage(sprite.variants.get("DEFAULT").spritesheetImages.get(key));
         } else {
             try {
