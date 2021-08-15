@@ -1,6 +1,7 @@
 package com.project610;
 
 import com.project610.runnables.AlphaMaskGenerator;
+import com.project610.runnables.FileReverter;
 import com.project610.runnables.ImageGenerator;
 import com.project610.runnables.SpriteDownloader;
 import com.project610.structs.JList2;
@@ -61,6 +62,8 @@ public class MainPanel extends JPanel {
     public HashMap<String, Icon> icons;
 
     private String graphicsPath = "data" + SLASH + "graphics" + SLASH + "00";
+    private String sfxPath = "data" + SLASH + "sound";
+    private String musicPath = "data" + SLASH + "music" + SLASH + "00";
     private String spritesDirName = "sprites";
     private String presetsDirName = "presets";
     private Path spritesPath = Paths.get("sprites");
@@ -189,6 +192,8 @@ public class MainPanel extends JPanel {
         menuBar = new JMenuBar();
         add(menuBar);
         menuBar.setLayout(new BoxLayout(menuBar, BoxLayout.LINE_AXIS));
+
+        // Stuff menu
         JMenu stuffMenu = new JMenu("Stuff");
         menuBar.add(stuffMenu);
         blockables.add(stuffMenu);
@@ -200,6 +205,19 @@ public class MainPanel extends JPanel {
         JMenuItem generateAlphaMaskButton = new JMenuItem("Generate Alpha Mask from spritesheet");
         generateAlphaMaskButton.addActionListener(e -> generateAlphaMask());
         stuffMenu.add(generateAlphaMaskButton);
+
+        // SFX/Music menu
+        JMenu sfxMusicMenu = new JMenu("SFX/Music");
+        menuBar.add(sfxMusicMenu);
+        blockables.add(sfxMusicMenu);
+
+        JMenuItem revertSfxButton = new JMenuItem("Revert to backed-up SFX");
+        revertSfxButton.addActionListener(e -> new Thread(new FileReverter(this, "sfx")).run());
+        sfxMusicMenu.add(revertSfxButton);
+
+        JMenuItem revertMusicButton = new JMenuItem("Revert to backed-up Music");
+        revertMusicButton.addActionListener(e -> new Thread(new FileReverter(this, "music")).run());
+        sfxMusicMenu.add(revertMusicButton);
 
 
         menuBar.add(Box.createHorizontalGlue());
@@ -1049,6 +1067,8 @@ public class MainPanel extends JPanel {
                             TreeMap<String, BufferedImage> spritesheetImages = new TreeMap<>();
                             TreeMap<String, BufferedImage> spritesheetMasks = new TreeMap<>();
                             TreeMap<String, BufferedImage> spritesheetColorMasks = new TreeMap<>();
+                            TreeMap<String, Path> sfx = new TreeMap<>();
+                            TreeMap<String, Path> music = new TreeMap<>();
                             for (Path path : paths) {
                                 String filename = path.getFileName().toString();
                                 if (filename.toLowerCase().endsWith("-mask.png")) {
@@ -1061,12 +1081,18 @@ public class MainPanel extends JPanel {
                                     if (filename.equals("info.txt")) {
                                         newVariant.setInfo(new String(Files.readAllBytes(path)));
                                     }
+                                } else if (filename.toLowerCase().endsWith(".wav")) {
+                                    sfx.put(filename.toLowerCase().replace(".wav",""), path);
+                                }else if (filename.toLowerCase().endsWith(".ogg")) {
+                                    music.put(filename.toLowerCase().replace(".ogg",""), path);
                                 }
                             }
 
                             newVariant.addImages(spritesheetImages);
                             newVariant.addMasks(spritesheetMasks);
                             newVariant.addColorMasks(spritesheetColorMasks);
+                            newVariant.addSfx(sfx);
+                            newVariant.addMusic(music);
 
                             newSprite.addVariant(newVariant.name, newVariant);
 
@@ -1198,8 +1224,16 @@ public class MainPanel extends JPanel {
     }
     */
 
-    public String path() {
+    public String gfxPath() {
         return installDirBox.getText() + SLASH + graphicsPath;
+    }
+
+    public String sfxPath() {
+        return installDirBox.getText() + SLASH + sfxPath;
+    }
+
+    public String musicPath() {
+        return installDirBox.getText() + SLASH + musicPath;
     }
 
     public TreeMap<String, BufferedImage> generateImagesForVariant(Sprite sprite, Variant variant, boolean freshStart, boolean shuffleColors, boolean chaosShuffle) {
@@ -1241,7 +1275,7 @@ public class MainPanel extends JPanel {
     }
 
     private BufferedImage generateImageForVariant(Sprite sprite, Variant variant, String key, boolean freshStart, boolean shuffleColors, boolean chaosShuffle) {
-        info("Generating image: " + path() + SLASH + key + extension);
+        info("Generating image: " + gfxPath() + SLASH + key + extension);
         BufferedImage newImage = null;
         if (freshStart) {
             // TODO: It occurs to me that Fresh Start is kinda dumb, and needs reworking. Saving that for 0.8 or something
@@ -1249,9 +1283,9 @@ public class MainPanel extends JPanel {
             newImage = copyImage(sprite.variants.get("DEFAULT").spritesheetImages.get(key));
         } else {
             try {
-                newImage = ImageIO.read(new File(path() + SLASH + key + extension));
+                newImage = ImageIO.read(new File(gfxPath() + SLASH + key + extension));
             } catch (Exception ex) {
-                error("Could not find/load base image at: " + path() + SLASH + key + extension, ex);
+                error("Could not find/load base image at: " + gfxPath() + SLASH + key + extension, ex);
             }
         }
         BufferedImage replacement = variant.spritesheetImages.get(key);
@@ -1385,31 +1419,6 @@ public class MainPanel extends JPanel {
         return b;
     }
 
-    /*private void save_OLD() {
-        try {
-            info("Trying to save changes");
-
-            if (installDirBox.getText().trim().length() == 0 || !Files.exists(Paths.get(path()))) {
-                installDirBox.setBackground(new Color(1.0f, 0.7f, 0.7f));
-                warn("Failed to locate graphics directory at: " + path());
-                return;
-            } else {
-                installDirBox.setBackground(new Color(1.0f, 1.0f, 1.0f));
-            }
-
-            if (null == spriteList.getSelectedValue() || null == variantList.getSelectedValue()) {
-                warn("Can't save without selecting a Sprite + Variant combo");
-                return;
-            }
-
-            // Process/save the images in another thread, so the UI doesn't hang
-            new Thread(imageGenerator).start();
-        }
-        catch (Exception ex) {
-            error("Save failed :(", ex);
-        }
-    }*/
-
     private void save() {
         try {
             info("----------\n");
@@ -1417,9 +1426,9 @@ public class MainPanel extends JPanel {
 
             newAdjustments(chaosShuffleBox.isSelected());
 
-            if (installDirBox.getText().trim().length() == 0 || !Files.exists(Paths.get(path()))) {
+            if (installDirBox.getText().trim().length() == 0 || !Files.exists(Paths.get(gfxPath()))) {
                 installDirBox.setBackground(new Color(1.0f, 0.7f, 0.7f));
-                warn("Failed to locate graphics directory at: " + path());
+                warn("Failed to locate graphics directory at: " + gfxPath());
                 return;
             } else {
                 installDirBox.setBackground(new Color(1.0f, 1.0f, 1.0f));

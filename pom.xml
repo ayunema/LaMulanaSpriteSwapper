@@ -6,11 +6,10 @@
 
     <groupId>com.project610.lamulana.spriteswapper</groupId>
     <artifactId>LaMulanaSpriteSwapper</artifactId>
-    <version>0.7.0</version>
+    <version>0.8.0-b0</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
     </properties>
 
 

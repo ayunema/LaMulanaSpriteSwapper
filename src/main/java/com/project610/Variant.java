@@ -1,6 +1,8 @@
 package com.project610;
 
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.TreeMap;
 
@@ -9,6 +11,8 @@ public class Variant {
     public TreeMap<String, BufferedImage> spritesheetImages;
     public TreeMap<String, BufferedImage> spritesheetMasks;
     public TreeMap<String, BufferedImage> spritesheetColorMasks;
+    public TreeMap<String, Path> sfx;
+    public TreeMap<String, Path> music;
     public String info = "";
 
     public Variant setName (String s) {
@@ -28,6 +32,16 @@ public class Variant {
 
     public Variant addColorMasks(TreeMap<String, BufferedImage> spritesheetColorMasks) {
         this.spritesheetColorMasks = spritesheetColorMasks;
+        return this;
+    }
+
+    public Variant addSfx(TreeMap<String, Path> sfx) {
+        this.sfx = sfx;
+        return this;
+    }
+
+    public Variant addMusic(TreeMap<String, Path> music) {
+        this.music = music;
         return this;
     }
 
