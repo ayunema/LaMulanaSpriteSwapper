@@ -44,6 +44,18 @@ The code is ugly, and will be for a while.
  **Okay but why didn't you start with that instead of the more-complicated Moogle example?**
  
  I am not good at this.
+ 
+ ## Custom sprite creators
+ * Virus610
+   * Lemeza/Moogle
+   * Lemeza/Invisible
+   * Lemeza/Sunglasses-overlay
+   * Tiamat/Tee-amat
+   * Tiamat/Invisible
+   * Tiamat/rainbow
+ * Nano
+   * Lemeza/Lumisa-Bluemisa
+   * Lemeza/Lumisa-KimonoCowgirl
 
 
 
