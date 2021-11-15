@@ -66,6 +66,7 @@ public class ImageGenerator implements Runnable {
                     }
                 }
                 try {
+                    mainPanel.info("Saving SFX: " + filename);
                     Files.copy(variant.sfx.get(key), Paths.get(filename), StandardCopyOption.REPLACE_EXISTING);
                     writeCount++;
                 } catch (Exception ex) {
@@ -89,6 +90,7 @@ public class ImageGenerator implements Runnable {
                     }
                 }
                 try {
+                    mainPanel.info("Saving Music: " + filename);
                     Files.copy(variant.music.get(key), Paths.get(filename), StandardCopyOption.REPLACE_EXISTING);
                     writeCount++;
                 } catch (Exception ex) {
