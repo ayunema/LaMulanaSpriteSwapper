@@ -1,0 +1,3 @@
+<div style="background: #3d85f1; font-size: 14px; font-family: arial; padding: 5px;">
+Artist: <span style="color: #98c7ff; font-weight: bold;">crappy blue (<a href="https://www.twitter.com/crappyblue" style="color: #ffffff;">@crappyblue</a>)</span>
+</div>
